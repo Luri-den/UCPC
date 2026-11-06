@@ -152,7 +152,7 @@ map.on("load", () => {
 });
 
 map.on("click", e => {
-  if (e.originalEvent.target.closest(".maplibregl-marker")) return;
+  if (e.originalEvent.target.closest(".maplibregl-marker") || mode === "newGrave" || mode === "putCem") return;
   const p = fix([e.lngLat.lng, e.lngLat.lat]);
   if (mode === "addCem") {
     const n = Math.max(0, ...cems.map(r => parseInt((r.ID || "").replace(/\D/g, ""), 10) || 0)) + 1;
@@ -277,7 +277,7 @@ function form(box, row, desc, key, F) {
 }
 function flags(box, row) {
   FLAGS.forEach(([f, label]) => box.append(el("label", {}, [el("input", { type:"checkbox", checked:row[f] === "1", onchange:e => {
-    row[f] = e.target.checked ? "1" : "0"; if (!intF.includes(f)) intF.push(f); touch("ints"); src("gr", map.getSource("gr")._data); refresh();
+    row[f] = e.target.checked ? "1" : "0"; if (!intF.includes(f)) intF.push(f); touch("ints"); refresh();
   } }), " " + label])));
 }
 
@@ -430,7 +430,7 @@ $("#open").onclick = async () => {
 $("#files").onchange = e => { dir = null; load([...e.target.files]); };
 $("#new").onclick = () => {
   const n = prompt("Name of the new map (for example: Fayette County Cemeteries)"); if (!n) return;
-  blank(); S.name = n; dir = null; tab("set"); drawSet(); refresh();
+  blank(); S.name = n; S.overlays = []; dir = null; tab("set"); drawSet(); refresh();
   say("New map started. Next: load a county outline file, zoom to the county, and press “Use what I'm looking at now”.");
 };
 
