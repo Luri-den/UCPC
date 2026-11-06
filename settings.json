@@ -1,0 +1,31 @@
+{
+  "name": "Union County",
+  "shortName": "UC",
+  "idPrefix": "UC",
+  "center": [
+    -84.8621418,
+    39.6253112
+  ],
+  "zoom": 10.73,
+  "colors": {
+    "accent": "#400080",
+    "public": "#01796F",
+    "permission": "#C9A227",
+    "private": "#D2691E",
+    "inaccessible": "#8B0000",
+    "unknown": "#777777",
+    "boundary": "#01796F",
+    "county": "#555555",
+    "grave": "#3f3528"
+  },
+  "files": {
+    "cemeteries": "cemlist.csv",
+    "interments": "interments.csv",
+    "boundaries": "cemetery-boundaries.geojson",
+    "county": "county.geojson"
+  },
+  "entranceSizes": [
+    "primary",
+    "secondary"
+  ]
+}
