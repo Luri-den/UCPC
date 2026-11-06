@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cemetery Map Editor</title>
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;height:100vh;display:flex;font:14px Arial,sans-serif;color:#3f3528;background:#f4f1e8}
@@ -90,6 +90,10 @@ small{color:#6b6258}
 <input type="file" id="files" multiple accept=".csv,.json,.geojson" hidden>
 
 <script>
+if (!window.maplibregl || !window.Papa) {
+  document.body.innerHTML = "<p style='padding:20px;font:16px Arial'>The map libraries didn't load. Open this page from your website (not a preview window) with an internet connection.</p>";
+  throw new Error("map libraries missing");
+}
 // ---------- helpers ----------
 const $ = s => document.querySelector(s);
 const el = (t, p, kids) => { const e = document.createElement(t); Object.assign(e, p || {}); (kids || []).forEach(k => e.append(k)); return e; };
@@ -505,8 +509,19 @@ $("#save").onclick = async () => {
 // Hidden button: the GitHub publisher "presses" it to collect the files (see publish.js)
 $("#dlBtn").onclick = () => { if (cems.length) outFiles().forEach(([n, t]) => dl(n, t)); };
 window.onbeforeunload = e => { if (dirty.size) { e.preventDefault(); return ""; } };
+// ---------- open straight from the site this page is served from (GitHub Pages) ----------
+async function loadFromSite() {
+  if (!/^https?:/.test(location.protocol)) return;
+  const get = async n => { try { const r = await fetch(new URL(n, document.baseURI).href, { cache:"no-store" }); return r.ok ? new File([await r.text()], n) : null; } catch (e) { return null; } };
+  const set = await get("settings.json");
+  let names = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson" };   // what the page used before settings.json existed
+  if (set) { try { names = Object.assign({}, FILES_DEF, JSON.parse(await set.text()).files || {}); } catch (e) {} }
+  const files = (await Promise.all([set].concat(Object.values(names).map(get)))).filter(Boolean);
+  if (files.length > 1) { say("Reading the map files from this site…"); await load(files); }
+}
+loadFromSite();
 </script>
 <script src="publish.js"></script>
-<script>GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } });</script>
+<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 </body>
 </html>
