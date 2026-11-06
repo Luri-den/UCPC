@@ -39,6 +39,7 @@ small{color:#6b6258}
 .pin{border:3px solid #fff;border-radius:50%;box-shadow:0 0 3px #000;cursor:grab}
 .pin.cem{width:26px;height:26px;background:#FFD700}
 .pin.primary{width:26px;height:26px;background:#01796F}
+.pin.start{width:26px;height:26px;background:#d4351c}
 .pin.secondary{width:16px;height:16px;background:#7fb5b0}
 .pin.gr{width:18px;height:18px;background:#3b6fd4}
 .vtx{width:12px;height:12px;background:#fff;border:2px solid #000;cursor:move}
@@ -50,7 +51,7 @@ small{color:#6b6258}
   <div class="top">
     <button id="open" class="go" style="background:#fff;color:#01796F">Open my map files</button>
     <button id="new">New county</button>
-    <button id="save" disabled>Save</button>
+    <button id="save" disabled>Save to folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open my map files” and pick your map folder to begin.</div>
   </div>
   <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button></div>
@@ -64,9 +65,15 @@ small{color:#6b6258}
     <small>Move and zoom the map to how visitors should first see it, then press the button.</small>
     <div class="row"><button id="setview">Use what I'm looking at now</button></div>
     <small id="viewtxt"></small>
-    <h3>County outline</h3>
-    <small>Visitors can't scroll far outside this outline.</small>
+    <h3>County or town outline</h3>
+    <small>Pick a county, town or state and the official US Census outline is fetched for you. It also sets the start view and allowed area.</small>
+    <div class="row"><select id="stype"><option value="COUNTY">County</option><option value="PLACE">Town / city</option><option value="STATE">State</option></select><select id="sstate"><option value="">— State —</option><option value="01">AL</option><option value="02">AK</option><option value="04">AZ</option><option value="05">AR</option><option value="06">CA</option><option value="08">CO</option><option value="09">CT</option><option value="10">DE</option><option value="11">DC</option><option value="12">FL</option><option value="13">GA</option><option value="15">HI</option><option value="16">ID</option><option value="17">IL</option><option value="18">IN</option><option value="19">IA</option><option value="20">KS</option><option value="21">KY</option><option value="22">LA</option><option value="23">ME</option><option value="24">MD</option><option value="25">MA</option><option value="26">MI</option><option value="27">MN</option><option value="28">MS</option><option value="29">MO</option><option value="30">MT</option><option value="31">NE</option><option value="32">NV</option><option value="33">NH</option><option value="34">NJ</option><option value="35">NM</option><option value="36">NY</option><option value="37">NC</option><option value="38">ND</option><option value="39">OH</option><option value="40">OK</option><option value="41">OR</option><option value="42">PA</option><option value="44">RI</option><option value="45">SC</option><option value="46">SD</option><option value="47">TN</option><option value="48">TX</option><option value="49">UT</option><option value="50">VT</option><option value="51">VA</option><option value="53">WA</option><option value="54">WV</option><option value="55">WI</option><option value="56">WY</option><option value="60">AS</option><option value="66">GU</option><option value="69">MP</option><option value="72">PR</option><option value="78">VI</option></select></div>
+    <div class="row"><input id="sname2" placeholder="Name, for example Fayette"><button id="sgo" class="go">Find</button></div>
+    <div class="list" id="schoose" hidden></div>
     <div class="row"><button id="cedit">Reshape outline</button><button id="cload">Load outline file…</button></div>
+    <h3>Allowed area</h3>
+    <small>Visitors can't scroll outside this red box. The red pin is the starting point: drag it.</small>
+    <div class="row"><button id="aedit">Edit box</button><button id="afit">Fit to outline</button><button id="aview">Use screen</button></div>
     <input type="file" id="cfile" accept=".json,.geojson" hidden>
   </div>
 
@@ -143,6 +150,8 @@ map.on("load", () => {
   map.addSource("cems", { type:"geojson", data:EMPTY });
   map.addSource("gr", { type:"geojson", data:EMPTY });
   map.addLayer({ id:"cnty", type:"line", source:"cnty", paint:{ "line-width":2, "line-dasharray":[2,2] } });
+  map.addSource("area", { type:"geojson", data:EMPTY });
+  map.addLayer({ id:"area", type:"line", source:"area", paint:{ "line-color":"#d4351c", "line-width":2, "line-dasharray":[4,3] } });
   map.addLayer({ id:"bnd", type:"line", source:"bnd", paint:{ "line-width":2.5 } });
   map.addLayer({ id:"cems", type:"circle", source:"cems", paint:{ "circle-radius":7, "circle-stroke-width":2, "circle-stroke-color":"#fff" } });
   map.addLayer({ id:"gr", type:"circle", source:"gr", paint:{
@@ -205,7 +214,7 @@ function bbox(r) {
 
 function setMode(m, text) {
   mode = m; const h = $("#hint"); h.hidden = !m; h.textContent = "";
-  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county") ? "Done" : "Cancel", onclick:() => { setMode(null); refresh(); } }));
+  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county" || m === "area") ? "Done" : "Cancel", onclick:() => { setMode(null); refresh(); } }));
   map.getCanvas().style.cursor = m ? "crosshair" : "";
   if (ready) refresh();
 }
@@ -249,6 +258,8 @@ function refresh() {
   src("bnd", bf());
   const cf = () => fc(county ? [county] : []);
   src("cnty", cf());
+  const A = S.maxBounds;
+  src("area", A ? fc([{ type:"Feature", properties:{}, geometry:{ type:"Polygon", coordinates:[[[A[0][0],A[0][1]],[A[1][0],A[0][1]],[A[1][0],A[1][1]],[A[0][0],A[1][1]],[A[0][0],A[0][1]]]] } }]) : EMPTY);
   const g = [];
   if (sel) ints.forEach((r, i) => { const c = ll(r); if (r.CEMETERY_ID === sel && c) g.push({ type:"Feature", properties:{ i, v:r.VETERAN === "1" ? 1 : 0, p:r.PIONEER === "1" ? 1 : 0, m:r.MAUS === "1" ? 1 : 0 }, geometry:{ type:"Point", coordinates:c } }); });
   src("gr", fc(g));
@@ -260,6 +271,8 @@ function refresh() {
   if (f) (f.properties.ENTRANCES || []).forEach(en => drag(en.coords, "pin " + (en.size || "primary"), p => { en.coords = p; touch("bounds"); }, en.label + " (drag to move)"));
   if (mode === "bound" && ringOf(f)) vertexMarkers(ringOf(f), "bounds", "bnd", bf);
   if (mode === "county" && ringOf(county)) vertexMarkers(ringOf(county), "county", "cnty", cf);
+  if (mode === "area" && A) [[0, 0], [1, 1]].forEach(([i, j]) => drag([A[i][0], A[j][1]], "vtx", p => { A[i][0] = p[0]; A[j][1] = p[1]; touch("settings"); refresh(); }, "Drag to resize"));
+  if (curTab === "set" && S.center) drag(S.center, "pin start", p => { S.center = p; touch("settings"); drawSet(); }, "Starting point (drag to move)");
   if (selG && ll(selG)) drag(ll(selG), "pin gr", p => { selG.LAT = p[1]; selG.LONG = p[0]; touch("ints"); refresh(); }, "Drag to move this grave");
 
   drawCem(); drawGrv();
@@ -380,7 +393,7 @@ $("#setview").onclick = () => { const c = map.getCenter(); S.center = fix([c.lng
 $("#cedit").onclick = () => { if (!ringOf(county)) return say("Load a county outline file first."); setMode("county", "Drag white squares to reshape. Click the map to add a point. Double-click a square to delete it."); };
 $("#cload").onclick = () => $("#cfile").click();
 $("#cfile").onchange = async e => {
-  try { county = pickCounty(JSON.parse((await e.target.files[0].text()).replace(/^\uFEFF/, ""))); touch("county"); refresh(); fitCounty(); }
+  try { newOutline(pickCounty(JSON.parse((await e.target.files[0].text()).replace(/^\uFEFF/, "")))); }
   catch (err) { say("That file isn't a county outline: " + err.message); }
 };
 function pickCounty(j) {
@@ -388,10 +401,40 @@ function pickCounty(j) {
   if (!ringOf(f)) throw new Error("no polygon found");
   return f;
 }
-function fitCounty() { if (ringOf(county)) map.fitBounds(bbox(ringOf(county)), { padding:30, animate:false }); }
+const bboxOf = g => { const b = new maplibregl.LngLatBounds(); (function w(c) { typeof c[0] === "number" ? b.extend(c) : c.forEach(w); })(g.coordinates); return b; };
+function fitCounty() { if (county && county.geometry) map.fitBounds(bboxOf(county.geometry), { padding:30, animate:false }); }
+function areaFromCounty() { const b = bboxOf(county.geometry), m = 0.05; S.maxBounds = [[+(b.getWest() - m).toFixed(4), +(b.getSouth() - m).toFixed(4)], [+(b.getEast() + m).toFixed(4), +(b.getNorth() + m).toFixed(4)]]; }
+function newOutline(f) {
+  const rd = c => typeof c[0] === "number" ? [+c[0].toFixed(5), +c[1].toFixed(5)] : c.map(rd);
+  county = { type:"Feature", properties:{ NAME:(f.properties || {}).NAME || "" }, geometry:{ type:f.geometry.type, coordinates:rd(f.geometry.coordinates) } };
+  areaFromCounty(); fitCounty();
+  const c = map.getCenter(); S.center = fix([c.lng, c.lat]); S.zoom = +map.getZoom().toFixed(2);
+  touch("county"); touch("settings"); drawSet(); refresh();
+}
+$("#sgo").onclick = async () => {
+  const k = $("#stype").value, st = $("#sstate").value, nm = $("#sname2").value.trim(), box = $("#schoose");
+  box.hidden = true;
+  if (!nm || (k !== "STATE" && !st)) return say("Type a name and choose a state.");
+  say("Searching the Census database…");
+  try {
+    const where = "UPPER(BASENAME) LIKE '%" + nm.replace(/'/g, "''").toUpperCase() + "%'" + (k === "STATE" ? "" : " AND STATE='" + st + "'");
+    const r = await fetch("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/" + { COUNTY:82, PLACE:28, STATE:80 }[k] + "/query?where=" + encodeURIComponent(where) + "&outFields=*&returnGeometry=true&f=geojson");
+    const list = ((await r.json()).features || []).filter(f => f.geometry).sort((a, b) => (+b.properties.POP100 || 0) - (+a.properties.POP100 || 0));
+    if (!list.length) return say("No match. Check the spelling and the state.");
+    const use = f => { box.hidden = true; newOutline(f); say("Outline loaded: " + f.properties.NAME + ". Save or publish when you're happy."); };
+    if (list.length === 1) return use(list[0]);
+    box.textContent = ""; box.hidden = false; say("Several matches: pick one.");
+    list.forEach(f => box.append(el("div", { textContent:f.properties.NAME + (f.properties.POP100 ? " · pop " + (+f.properties.POP100).toLocaleString() : ""), onclick:() => use(f) })));
+  } catch (e) { say("Search failed: " + e.message); }
+};
+$("#aedit").onclick = () => { if (!S.maxBounds) return say("Find an outline first, or press “Use screen”."); setMode("area", "Drag the two white squares to resize the allowed area."); };
+$("#afit").onclick = () => { if (!county) return say("Find an outline first."); areaFromCounty(); touch("settings"); refresh(); };
+$("#aview").onclick = () => { const b = map.getBounds(); S.maxBounds = [[+b.getWest().toFixed(4), +b.getSouth().toFixed(4)], [+b.getEast().toFixed(4), +b.getNorth().toFixed(4)]]; touch("settings"); refresh(); };
 
 // ---------- tabs ----------
+let curTab = "set";
 function tab(t) {
+  curTab = t; if (ready) setTimeout(refresh, 0);
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
   document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === t));
 }
@@ -431,30 +474,39 @@ $("#files").onchange = e => { dir = null; load([...e.target.files]); };
 $("#new").onclick = () => {
   const n = prompt("Name of the new map (for example: Fayette County Cemeteries)"); if (!n) return;
   blank(); S.name = n; S.overlays = []; dir = null; tab("set"); drawSet(); refresh();
-  say("New map started. Next: load a county outline file, zoom to the county, and press “Use what I'm looking at now”.");
+  say("New map started. Next, on the Map tab, search for your county or town outline.");
 };
 
 // ---------- saving ----------
+function outFiles() {
+  if (!S.center) { const c = map.getCenter(); S.center = fix([c.lng, c.lat]); S.zoom = +map.getZoom().toFixed(2); }
+  if (!S.maxBounds && county) areaFromCounty();
+  const o = [["settings.json", JSON.stringify(S, null, 2)]];
+  if (dirty.has("cem")) o.push([S.files.cemeteries, Papa.unparse(cems, { columns:cemF })]);
+  if (dirty.has("ints")) o.push([S.files.interments, Papa.unparse(ints, { columns:intF })]);
+  if (dirty.has("bounds")) o.push([S.files.boundaries, JSON.stringify(bounds, null, 1)]);
+  if (dirty.has("county") && county) o.push([S.files.county, JSON.stringify(county, null, 1)]);
+  return o;
+}
+const dl = (n, t) => el("a", { href:URL.createObjectURL(new Blob([t])), download:n }).click();
+function clean() { dirty.clear(); $("#save").disabled = true; $("#save").className = ""; }
 async function put(name, text) {
   if (dir) { const w = await (await dir.getFileHandle(name, { create:true })).createWritable(); await w.write(text); await w.close(); }
-  else { el("a", { href:URL.createObjectURL(new Blob([text])), download:name }).click(); await new Promise(r => setTimeout(r, 400)); }
+  else { dl(name, text); await new Promise(r => setTimeout(r, 400)); }
 }
 $("#save").onclick = async () => {
   try {
     if (!dir && window.showDirectoryPicker && confirm("Choose the folder to save into (your map folder).")) dir = await showDirectoryPicker({ mode:"readwrite" });
-    if (!S.center) { const c = map.getCenter(); S.center = fix([c.lng, c.lat]); S.zoom = +map.getZoom().toFixed(2); }
-    if (ringOf(county)) { const b = bbox(ringOf(county)); S.maxBounds = [[+(b.getWest() - 0.05).toFixed(4), +(b.getSouth() - 0.05).toFixed(4)], [+(b.getEast() + 0.05).toFixed(4), +(b.getNorth() + 0.05).toFixed(4)]]; }
-    S.entranceSizes = ["primary", "secondary"];
-    await put("settings.json", JSON.stringify(S, null, 2));
-    if (dirty.has("cem")) await put(S.files.cemeteries, Papa.unparse(cems, { columns:cemF }));
-    if (dirty.has("ints")) await put(S.files.interments, Papa.unparse(ints, { columns:intF }));
-    if (dirty.has("bounds")) await put(S.files.boundaries, JSON.stringify(bounds, null, 1));
-    if (dirty.has("county") && county) await put(S.files.county, JSON.stringify(county, null, 1));
-    dirty.clear(); $("#save").disabled = true; $("#save").className = "";
+    for (const [n, t] of outFiles()) await put(n, t);
+    clean();
     say(dir ? "Saved into your folder." : "Saved. Your browser put the files in Downloads: copy them over the old ones in your map folder.");
   } catch (e) { if (e.name !== "AbortError") say("Save failed: " + e.message); }
 };
+// Hidden button: the GitHub publisher "presses" it to collect the files (see publish.js)
+$("#dlBtn").onclick = () => { if (cems.length) outFiles().forEach(([n, t]) => dl(n, t)); };
 window.onbeforeunload = e => { if (dirty.size) { e.preventDefault(); return ""; } };
 </script>
+<script src="publish.js"></script>
+<script>GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } });</script>
 </body>
 </html>
