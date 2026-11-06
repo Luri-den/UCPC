@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+
+>
+
+<title>Cemetery Details</title>
+
+<style>
+
+/* ============================================================
+   PAGE
+   ============================================================ */
+
+body {
+
+    font-family: Arial, sans-serif;
+
+    margin: 0;
+
+    background: #f4f1eb;
+
+    color: #333;
+
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+header {
+
+    background: #01796F;
+
+    color: white;
+
+    padding: 20px;
+
+}
+
+header h1 {
+
+    margin: 0;
+
+}
+
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+
+main {
+
+    max-width: 1000px;
+
+    margin: 30px auto;
+
+    padding: 0 20px;
+
+}
+
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+
+section {
+
+    background: white;
+
+    padding: 20px;
+
+    margin-bottom: 20px;
+
+    border-radius: 6px;
+
+}
+
+
+/* ============================================================
+   SECTION HEADINGS
+   ============================================================ */
+
+h2 {
+
+    color: #463a2d;
+
+    border-bottom: 1px solid #ccc;
+
+    padding-bottom: 8px;
+
+}
+
+
+/* ============================================================
+   GENERAL FIELDS
+   ============================================================ */
+
+.field {
+
+    display: grid;
+
+    grid-template-columns: 180px 1fr;
+
+    column-gap: 10px;
+
+    margin-bottom: 8px;
+
+}
+
+
+.label {
+
+    font-weight: bold;
+
+}
+
+
+.person-name-left {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 0;
+
+}
+   
+/* ============================================================
+   PERSON NAME
+   ============================================================ */
+
+.person-name {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    font-weight: bold;
+
+    font-size: 24px;
+
+    margin-bottom: 18px;
+
+}
+
+
+/* ============================================================
+   VETERAN ICON
+   ============================================================ */
+
+.veteran-icon {
+
+    width: 24px;
+
+    height: 24px;
+
+    object-fit: contain;
+
+    margin-left: 12px;
+
+}
+
+
+/* ============================================================
+   PIONEER ICON
+   ============================================================ */
+
+.pioneer-icon {
+
+    width: 24px;
+
+    height: 24px;
+
+    object-fit: contain;
+
+    margin-right: 12px;
+
+}
+
+
+/* ============================================================
+   VETERAN DETAILS
+   ============================================================ */
+
+.veteran-details {
+
+    margin-top: 4px;
+
+}
+
+   /* ============================================================
+   GRAVE PHOTO IN INTERMENT LIST
+   ============================================================ */
+
+.interment-with-photo {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.interment-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.grave-list-photo {
+    width: 110px;
+    height: 140px;
+    object-fit: cover;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.grave-list-photo:hover {
+    border-color: #01796F;
+}
+
+@media (max-width: 600px) {
+
+    .grave-list-photo {
+        width: 85px;
+        height: 110px;
+    }
+
+    .interment-with-photo {
+        gap: 10px;
+    }
+
+}
+
+/* ============================================================
+   INTERMENT RECORDS
+   ============================================================ */
+
+.interment {
+
+    border-bottom: 1px solid #ddd;
+
+    padding: 12px 0;
+
+}
+
+.interment:last-child {
+
+    border-bottom: none;
+
+}
+
+
+/* ============================================================
+   ERROR MESSAGE
+   ============================================================ */
+
+.error {
+
+    color: #8B0000;
+
+    font-weight: bold;
+
+}
+
+
+/* ============================================================
+   LINKS
+   ============================================================ */
+
+a {
+
+    color: #01796F;
+
+}
+
+
+/* ============================================================
+   CEMETERY PHOTO GALLERY
+   ============================================================ */
+
+.photo-gallery {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 12px;
+
+}
+
+
+.cemetery-photo {
+
+    width: auto;
+
+    height: 125px;
+
+    object-fit: contain;
+
+    border-radius: 5px;
+
+    border: 1px solid #ccc;
+
+    cursor: pointer;
+
+}
+
+
+/* ============================================================
+   PHOTO LIGHTBOX
+   ============================================================ */
+
+.photo-lightbox {
+
+    display: none;
+
+    position: fixed;
+
+    z-index: 9999;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background: rgba(0, 0, 0, 0.9);
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 20px;
+
+    box-sizing: border-box;
+
+}
+
+
+.photo-lightbox img {
+
+    max-width: 95%;
+
+    max-height: 95%;
+
+    width: auto;
+
+    height: auto;
+
+    object-fit: contain;
+
+    cursor: pointer;
+
+}
+
+
+/* ============================================================
+   MOBILE LAYOUT
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    .field {
+
+        grid-template-columns: 140px 1fr;
+
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- ============================================================
+     PAGE HEADER
+     ============================================================ -->
+
+<header>
+
+
+<h1 id="cemetery-name">
+    Cemetery
+</h1>
+
+
+</header>
+
+<!-- ============================================================
+     MAIN CONTENT
+     ============================================================ -->
+
+<main>
+
+
+<!-- ========================================================
+     CEMETERY INFORMATION
+     ======================================================== -->
+
+<section>
+
+    <h2>
+        Cemetery Information
+    </h2>
+
+    <div id="cemetery-information">
+        Loading...
+    </div>
+
+</section>
+
+
+<!-- ========================================================
+     CEMETERY PHOTOS
+     ======================================================== -->
+
+<section>
+
+    <h2>
+        Cemetery Photos
+    </h2>
+
+    <div
+        id="cemetery-photos"
+        class="photo-gallery"
+    >
+        Loading...
+    </div>
+
+</section>
+
+
+<!-- ========================================================
+     INTERMENTS
+     ======================================================== -->
+
+<section>
+
+    <h2>
+        Interments
+    </h2>
+
+    <div id="interments">
+        Loading...
+    </div>
+
+</section>
+
+
+</main>
+
+<!-- ============================================================
+     PHOTO LIGHTBOX
+     ============================================================ -->
+
+<div
+    id="photo-lightbox"
+    class="photo-lightbox"
+>
+
+
+<img
+    id="lightbox-image"
+    src=""
+    alt="Expanded cemetery photograph"
+>
+
+
+</div>
+
+<!-- ============================================================
+     PAPAPARSE
+     ============================================================ -->
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+<script>
+
+
+// ============================================================
+// CSV FILE LOCATIONS
+// ============================================================
+
+const CEMETERY_CSV_PATH =
+    new URL(
+        "cemlist.csv",
+        document.baseURI
+    ).href;
+
+
+const INTERMENTS_CSV_PATH =
+    new URL(
+        "interments.csv",
+        document.baseURI
+    ).href;
+
+
+// ============================================================
+// GET CEMETERY ID FROM URL
+// ============================================================
+
+const urlParameters =
+    new URLSearchParams(
+        window.location.search
+    );
+
+
+const cemeteryID =
+    urlParameters.get("id");
+
+
+// ============================================================
+// START PAGE
+// ============================================================
+
+if (!cemeteryID) {
+
+    document.getElementById(
+        "cemetery-information"
+    ).innerHTML =
+        '<p class="error">No cemetery ID was provided.</p>';
+
+} else {
+
+    loadCemetery();
+
+}
+
+
+// ============================================================
+// LOAD CEMETERY INFORMATION
+// ============================================================
+
+function loadCemetery() {
+
+    Papa.parse(
+        CEMETERY_CSV_PATH,
+        {
+
+            download: true,
+
+            header: true,
+
+            skipEmptyLines: true,
+
+            complete: function(results) {
+
+
+                const cemetery =
+                    results.data.find(
+                        function(row) {
+
+                            return (
+
+                                String(row.ID).trim()
+
+                                ===
+
+                                String(cemeteryID).trim()
+
+                            );
+
+                        }
+                    );
+
+
+                // ------------------------------------------------
+                // CEMETERY NOT FOUND
+                // ------------------------------------------------
+
+                if (!cemetery) {
+
+                    document.getElementById(
+                        "cemetery-information"
+                    ).innerHTML =
+                        '<p class="error">Cemetery not found.</p>';
+
+                    return;
+
+                }
+
+
+                // ------------------------------------------------
+                // CEMETERY NAME
+                // ------------------------------------------------
+
+                document.getElementById(
+                    "cemetery-name"
+                ).textContent =
+
+                    cemetery.NAME
+                    ||
+                    "N/A";
+
+
+                // ------------------------------------------------
+                // CEMETERY INFORMATION
+                // ------------------------------------------------
+
+                document.getElementById(
+                    "cemetery-information"
+                ).innerHTML = `
+
+                    <div class="field">
+
+                        <span class="label">
+                            Alternate Name:
+                        </span>
+
+                        ${cemetery["OTHER NAMES"] || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Township:
+                        </span>
+
+                        ${cemetery.TOWNSHIP || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Established:
+                        </span>
+
+                        ${cemetery["EST."] || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Map Location:
+                        </span>
+
+                        ${cemetery["MAP LOCATION"] || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Grave Count:
+                        </span>
+
+                        ${cemetery.COUNT || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Approximate Size:
+                        </span>
+
+                        ${cemetery["APPROXIMATE SIZE"] || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Condition:
+                        </span>
+
+                        ${cemetery.CONDITION || "N/A"}
+
+                    </div>
+
+
+                    <div class="field">
+
+                        <span class="label">
+                            Notes:
+                        </span>
+
+                        ${cemetery.NOTES || "N/A"}
+
+                    </div>
+
+                `;
+
+
+                // ------------------------------------------------
+                // LOAD PHOTOS
+                // ------------------------------------------------
+
+                loadPhotos();
+
+
+                // ------------------------------------------------
+                // LOAD INTERMENTS
+                // ------------------------------------------------
+
+                loadInterments();
+
+            }
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// LOAD CEMETERY PHOTOS
+// ============================================================
+
+function loadPhotos() {
+
+
+    const container =
+        document.getElementById(
+            "cemetery-photos"
+        );
+
+
+   // --------------------------------------------------------
+// PHOTO FILE NAMES
+//
+// First photo:
+// FC0031.jpg
+// FC0031.png
+//
+// Additional photos:
+// FC0031-2.jpg
+// FC0031-2.png
+// FC0031-3.webp
+// etc.
+// --------------------------------------------------------
+
+const extensions = [
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "gif"
+];
+
+
+const photoPaths = [];
+
+
+for (let i = 0; i <= 5; i++) {
+
+    const suffix =
+        i === 0
+            ? ""
+            : `-${i + 1}`;
+
+
+    extensions.forEach(
+        function(ext) {
+
+            photoPaths.push(
+                `photos/${encodeURIComponent(cemeteryID)}${suffix}.${ext}`
+            );
+
+        }
+    );
+
+}
+
+const validPhotos = [];
+
+let completed = 0;
+   
+    // --------------------------------------------------------
+    // CHECK EACH PHOTO
+    // --------------------------------------------------------
+
+    photoPaths.forEach(
+        function(photoPath) {
+
+
+            const image =
+                new Image();
+
+
+            image.onload =
+                function() {
+
+
+                    validPhotos.push(
+                        photoPath
+                    );
+
+
+                    completed++;
+
+
+                    if (
+                        completed
+                        ===
+                        photoPaths.length
+                    ) {
+
+                        displayPhotos();
+
+                    }
+
+                };
+
+
+            image.onerror =
+                function() {
+
+
+                    completed++;
+
+
+                    if (
+                        completed
+                        ===
+                        photoPaths.length
+                    ) {
+
+                        displayPhotos();
+
+                    }
+
+                };
+
+
+            image.src =
+                photoPath;
+
+
+        }
+    );
+
+
+    // --------------------------------------------------------
+    // DISPLAY PHOTOS
+    // --------------------------------------------------------
+
+    function displayPhotos() {
+
+
+        if (
+            validPhotos.length
+            ===
+            0
+        ) {
+
+            container.innerHTML =
+                "<p>No cemetery photos currently available.</p>";
+
+            return;
+
+        }
+
+
+        container.innerHTML =
+
+            validPhotos.map(
+                function(photoPath) {
+
+
+                    return `
+
+                        <img
+                            src="${photoPath}"
+                            alt="Cemetery photograph"
+                            class="cemetery-photo"
+                            onclick="openLightbox('${photoPath}')"
+                        >
+
+                    `;
+
+
+                }
+            ).join("");
+
+
+    }
+
+}
+
+
+// ============================================================
+// PHOTO LIGHTBOX
+// ============================================================
+
+const lightbox =
+    document.getElementById(
+        "photo-lightbox"
+    );
+
+
+const lightboxImage =
+    document.getElementById(
+        "lightbox-image"
+    );
+
+
+// ============================================================
+// OPEN LIGHTBOX
+// ============================================================
+
+function openLightbox(
+    photoPath
+) {
+
+
+    lightboxImage.src =
+        photoPath;
+
+
+    lightbox.style.display =
+        "flex";
+
+
+}
+
+
+// ============================================================
+// CLOSE LIGHTBOX
+// ============================================================
+
+function closeLightbox() {
+
+
+    lightbox.style.display =
+        "none";
+
+
+    lightboxImage.src =
+        "";
+
+
+}
+
+
+// ============================================================
+// CLOSE BY TAPPING IMAGE
+// ============================================================
+
+lightboxImage.addEventListener(
+    "click",
+    function(event) {
+
+
+        event.stopPropagation();
+
+
+        closeLightbox();
+
+
+    }
+);
+
+
+// ============================================================
+// CLOSE BY TAPPING DARK BACKGROUND
+// ============================================================
+
+lightbox.addEventListener(
+    "click",
+    function() {
+
+
+        closeLightbox();
+
+
+    }
+);
+
+
+// ============================================================
+// CLOSE WITH ESCAPE KEY
+// ============================================================
+
+document.addEventListener(
+    "keydown",
+    function(event) {
+
+
+        if (
+            event.key
+            ===
+            "Escape"
+        ) {
+
+            closeLightbox();
+
+        }
+
+    }
+);
+
+
+// ============================================================
+// LOAD INTERMENTS
+// ============================================================
+
+function loadInterments() {
+
+    Papa.parse(
+        INTERMENTS_CSV_PATH,
+        {
+
+            download: true,
+
+            header: true,
+
+            skipEmptyLines: true,
+
+            complete: function(results) {
+
+
+                const cemeteryInterments =
+                    results.data.filter(
+                        function(row) {
+
+
+                            return (
+
+                                String(
+                                    row.CEMETERY_ID
+                                ).trim()
+
+                                ===
+
+                                String(
+                                    cemeteryID
+                                ).trim()
+
+                            );
+
+
+                        }
+                    );
+
+
+                displayInterments(
+                    cemeteryInterments
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// DISPLAY INTERMENTS
+// ============================================================
+
+function displayInterments(
+    interments
+) {
+
+
+    const container =
+        document.getElementById(
+            "interments"
+        );
+
+
+    // --------------------------------------------------------
+    // NO RECORDS
+    // --------------------------------------------------------
+
+    if (
+        interments.length
+        ===
+        0
+    ) {
+
+        container.innerHTML =
+            "<p>No interment records found.</p>";
+
+        return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // DISPLAY RECORDS
+    // --------------------------------------------------------
+
+    container.innerHTML =
+
+        interments.map(
+            function(row) {
+
+                // ------------------------------------------------
+                // GRAVE PHOTO
+                //
+                // Uses MARKER_ID:
+                // M-202-007
+                //
+                // Looks for:
+                // photos/gravepics/M-202-007-1.jpg
+                // ------------------------------------------------
+
+                const markerID =
+                    String(
+                        row.MARKER_ID
+                        ||
+                        ""
+                    ).trim();
+
+
+                const gravePhoto =
+                    markerID
+                        ? `photos/gravepics/${encodeURIComponent(markerID)}-1.jpg`
+                        : "";
+                // ------------------------------------------------
+                // NAME
+                // ------------------------------------------------
+
+                const firstName =
+                    row["FIRST NAME"]
+                    ||
+                    "N/A";
+
+
+                const lastName =
+                    row["LAST NAME"]
+                    ||
+                    "N/A";
+
+
+                // ------------------------------------------------
+                // VETERAN STATUS
+                // ------------------------------------------------
+
+                const veteranValue =
+                    String(
+                        row.VETERAN
+                    ).trim();
+
+
+                let veteranText =
+                    "N/A";
+
+
+                if (
+                    veteranValue
+                    ===
+                    "1"
+                ) {
+
+                    veteranText =
+                        "Yes";
+
+                }
+
+                else if (
+                    veteranValue
+                    ===
+                    "0"
+                ) {
+
+                    veteranText =
+                        "No";
+
+                }
+
+
+                // ------------------------------------------------
+                // VETERAN ICON
+                // ------------------------------------------------
+
+                const veteranIcon =
+
+                    veteranValue
+                    ===
+                    "1"
+
+                        ? `
+
+                            <img
+                                src="veticon.svg"
+                                alt="Veteran"
+                                class="veteran-icon"
+                                title="Veteran"
+                            >
+
+                          `
+
+                        : "";
+
+
+                // ------------------------------------------------
+                // VETERAN DETAILS
+                // ------------------------------------------------
+
+                let veteranDetails =
+                    "";
+
+
+                if (
+
+                    veteranValue
+                    ===
+                    "1"
+
+                    &&
+
+                    String(
+                        row["VET DETAILS"]
+                    ).trim()
+                    !==
+                    ""
+
+                ) {
+
+                    veteranDetails = `
+
+                        <div class="veteran-details">
+
+                            ${row["VET DETAILS"]}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                // ------------------------------------------------
+                // WAR
+                //
+                // Only shown when the person is a veteran and
+                // the WAR field contains a value.
+                // ------------------------------------------------
+
+                let warText =
+                    "";
+
+
+                if (
+
+                    veteranValue
+                    ===
+                    "1"
+
+                    &&
+
+                    String(
+                        row.WAR
+                    ).trim()
+                    !==
+                    ""
+
+                ) {
+
+                    warText = `
+
+                        <div class="veteran-details">
+
+                            ${row.WAR}
+
+                        </div>
+
+                    `;
+
+                }
+
+
+                // ------------------------------------------------
+                // PIONEER STATUS
+                // ------------------------------------------------
+
+                const pioneerValue =
+                    String(
+                        row.PIONEER
+                    ).trim();
+
+
+                let pioneerText =
+                    "N/A";
+
+
+                if (
+                    pioneerValue
+                    ===
+                    "1"
+                ) {
+
+                    pioneerText =
+                        "Yes";
+
+                }
+
+                else if (
+                    pioneerValue
+                    ===
+                    "0"
+                ) {
+
+                    pioneerText =
+                        "No";
+
+                }
+
+
+                // ------------------------------------------------
+                // PIONEER ICON
+                // ------------------------------------------------
+
+                const pioneerIcon =
+
+                    pioneerValue
+                    ===
+                    "1"
+
+                        ? `
+
+                            <img
+                                src="pioneericon.png"
+                                alt="Pioneer"
+                                class="pioneer-icon"
+                                title="Pioneer"
+                            >
+
+                          `
+
+                        : "";
+
+
+                // ------------------------------------------------
+                // RETURN INTERMENT
+                // ------------------------------------------------
+
+               return `
+
+    <div class="interment">
+
+        <div class="interment-with-photo">
+
+            <div class="interment-details">
+
+                <div class="person-name">
+
+                            <span class="person-name-left">
+
+                                ${pioneerIcon}
+
+                                ${firstName} ${lastName}
+
+                            </span>
+
+                            ${veteranIcon}
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Birth:
+                            </span>
+
+                            <span>
+                                ${row.BIRTH || "N/A"}
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Death:
+                            </span>
+
+                            <span>
+                                ${row.DEATH || "N/A"}
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Row:
+                            </span>
+
+                            <span>
+                                ${row.ROW || "N/A"}
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Plot:
+                            </span>
+
+                            <span>
+                                ${row.PLOT || "N/A"}
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Additional Information:
+                            </span>
+
+                            <span>
+                                ${
+                                    row[
+                                        "ADDITIONAL INFORMATION ON STONE"
+                                    ]
+                                    ||
+                                    "N/A"
+                                }
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Veteran:
+                            </span>
+
+                            <span>
+
+                                ${veteranText}
+
+                                ${warText}
+
+                                ${veteranDetails}
+
+                            </span>
+
+                        </div>
+
+
+                        <div class="field">
+
+                            <span class="label">
+                                Pioneer:
+                            </span>
+
+                            <span>
+                                ${pioneerText}
+                            </span>
+
+                                              </div>
+
+
+                    </div>
+
+
+                    ${
+                        gravePhoto
+                            ? `
+
+                                <img
+                                    src="${gravePhoto}"
+                                    alt="Grave marker photograph"
+                                    class="grave-list-photo"
+                                    onclick="openGravePhoto('${gravePhoto}')"
+                                    onerror="this.style.display='none';"
+                                >
+
+                              `
+                            : ""
+                    }
+
+
+                </div>
+
+            </div>
+
+        `;
+
+            }
+        ).join("");
+
+
+}
+
+
+</script>
+
+</body>
+
+</html>

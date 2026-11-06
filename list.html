@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#01796F">
+<title>Cemetery and People Lists | Franklin County Indiana Pioneer Cemeteries Archive Prototype</title>
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; color: #3f3528; }
+    body { background: #f4f1e8; }
+
+    /* ---------- HEADER ---------- */
+    header { background: #01796F; color: white; padding: 14px 18px; }
+    header h1 { margin: 0 0 5px 0; font-size: 22px; }
+    header p { margin: 0; font-size: 14px; opacity: 0.9; }
+    header a { color: white; text-decoration: underline; }
+    header a:hover { opacity: 0.8; }
+
+    /* ---------- CONTROLS ---------- */
+    #controls {
+        background: #eee9dc; border-bottom: 1px solid #c9c1b2; padding: 10px;
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    }
+
+    #search-wrapper { position: relative; flex: 1 1 240px; min-width: 180px; }
+
+    #search {
+        width: 100%; padding: 9px 34px 9px 10px;
+        border: 1px solid #aaa; border-radius: 4px; font-size: 15px;
+    }
+
+    #clear-search {
+        position: absolute; top: 50%; right: 5px; transform: translateY(-50%);
+        width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%;
+        background: transparent; color: #777; font-size: 20px; line-height: 26px; cursor: pointer;
+    }
+    #clear-search:hover { background: #e5e0d5; color: #333; }
+
+    #view-toggles { display: flex; gap: 4px; }
+
+    .toggle {
+        padding: 8px 12px; border: 1px solid #aaa; border-radius: 4px;
+        background: #ddd8cc; color: #463a2d; font-size: 14px; cursor: pointer;
+    }
+    .toggle:hover { background: #cfc8bb; }
+    .toggle.active { background: #01796F; border-color: #01796F; color: white; }
+    .toggle.active:hover { background: #463a2d; border-color: #463a2d; }
+
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+        outline: 3px solid #0b57d0; outline-offset: 2px;
+    }
+
+    /* ---------- LETTER BAR (People) ---------- */
+    #letter-bar { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 10px 0 10px; }
+    #letter-bar .toggle { min-width: 34px; padding: 6px 8px; font-size: 13px; }
+
+    /* ---------- MOBILE SORT (Cemeteries) ---------- */
+    .mobile-sort { display: none; align-items: center; gap: 6px; padding: 10px 10px 0 10px; font-size: 14px; }
+    .mobile-sort select { padding: 7px; font-size: 14px; border: 1px solid #aaa; border-radius: 4px; }
+    .mobile-sort button {
+        padding: 7px 12px; border: 1px solid #8d8375; border-radius: 4px;
+        background: #01796F; color: white; font-size: 14px; cursor: pointer;
+    }
+    .mobile-sort button:hover { background: #463a2d; }
+
+    /* ---------- STATUS ---------- */
+    #status { padding: 10px 12px 4px 12px; font-size: 14px; color: #6b6258; }
+
+    /* ---------- TABLES ---------- */
+    main { padding-bottom: 30px; }
+    .table-wrap { padding: 0 10px; overflow-x: auto; }
+
+    table {
+        width: 100%; border-collapse: collapse; background: white;
+        border: 1px solid #c9c1b2; font-size: 14px;
+    }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e3ddd0; vertical-align: top; }
+    thead th { background: #01796F; color: white; white-space: nowrap; }
+    tbody tr:hover { background: #f7f4ec; }
+
+    .sort-button {
+        padding: 0; border: none; background: transparent; color: inherit;
+        font: inherit; font-weight: bold; cursor: pointer; text-align: left;
+    }
+    .sort-button:hover { text-decoration: underline; background: transparent; }
+    thead .sort-button:focus-visible { outline-color: #ffffff; }
+    .sort-arrow { display: inline-block; min-width: 1em; font-size: 11px; }
+
+    td a { color: #01796F; font-weight: bold; }
+    td a:hover { color: #463a2d; }
+    .muted { color: #6b6258; font-size: 13px; font-weight: normal; }
+    .tag {
+        display: inline-block; margin: 0 4px 2px 0; padding: 1px 7px;
+        border: 1px solid #8d8375; border-radius: 10px; font-size: 12px; background: #f4f1e8;
+    }
+
+    .message { padding: 16px 12px; font-size: 14px; line-height: 1.45; }
+    .error-message { color: #8b0000; }
+
+    #show-more {
+        display: block; margin: 14px auto 0 auto; padding: 10px 18px;
+        border: 1px solid #8d8375; border-radius: 4px;
+        background: #01796F; color: white; font-size: 14px; font-weight: bold; cursor: pointer;
+    }
+    #show-more:hover { background: #463a2d; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    /* ---------- MOBILE: each row becomes a card ---------- */
+    @media (max-width: 700px) {
+        header { padding: 11px 13px; padding-top: calc(11px + env(safe-area-inset-top)); }
+        header h1 { font-size: 18px; }
+        header p { font-size: 12px; }
+
+        #search { font-size: 16px; }
+        .mobile-sort { display: flex; }
+
+        .table-wrap { overflow-x: visible; }
+        table, tbody, tr, td { display: block; }
+        table { background: transparent; border: none; }
+
+        thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+        tr {
+            margin-bottom: 10px; padding: 6px 12px; background: white;
+            border: 1px solid #c9c1b2; border-radius: 5px;
+        }
+        td {
+            display: grid; grid-template-columns: 105px 1fr; column-gap: 8px;
+            padding: 4px 0; border: none;
+        }
+        td::before { content: attr(data-label); font-weight: bold; color: #6b6258; }
+    }
+
+    @media (pointer: coarse) {
+        .toggle, #letter-bar .toggle { min-height: 40px; }
+        #clear-search { width: 36px; height: 36px; line-height: 36px; font-size: 24px; right: 3px; }
+    }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>Cemetery and People Lists</h1>
+    <p>Franklin County Indiana Pioneer Cemeteries Archive Prototype &middot; <a href="#" id="back-link">&larr; Back to the Map</a></p>
+</header>
+
+<main>
+
+<div id="controls">
+
+    <div id="view-toggles" role="group" aria-label="List type">
+        <button type="button" class="toggle active" id="view-cemeteries" aria-pressed="true">Cemeteries</button>
+        <button type="button" class="toggle" id="view-people" aria-pressed="false">People</button>
+    </div>
+
+    <div id="search-wrapper">
+        <input type="text" id="search" placeholder="Search cemeteries..." aria-label="Search the list">
+        <button id="clear-search" type="button" title="Clear search" aria-label="Clear search" hidden>&times;</button>
+    </div>
+
+    <button type="button" class="toggle" id="veterans-only" aria-pressed="false">Veterans Only</button>
+</div>
+
+<div id="letter-bar" role="group" aria-label="Filter by last name initial" hidden></div>
+
+<div class="mobile-sort" id="mobile-sort">
+    <label for="sort-select">Sort by</label>
+    <select id="sort-select"></select>
+    <button type="button" id="sort-direction" aria-label="Reverse sort order"></button>
+</div>
+
+<div id="status" aria-live="polite">Loading lists...</div>
+
+<section id="cemeteries-section" class="table-wrap">
+    <table id="cemeteries-table" role="table"></table>
+    <div id="cemeteries-message" class="message" hidden></div>
+</section>
+
+<section id="people-section" class="table-wrap" hidden>
+    <table id="people-table" role="table"></table>
+    <div id="people-message" class="message" hidden></div>
+    <button type="button" id="show-more" hidden></button>
+</section>
+
+</main>
+
+<script>
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+// The map page this list links to. Change this if the map page is renamed
+// (for example to index.html).
+const MAP_PAGE = "test2.html";
+
+const CEMETERY_CSV = "cemlist.csv";
+const INTERMENT_CSV = "interments.csv";
+
+const PEOPLE_PAGE_SIZE = 250;
+
+const ACCESS_LABELS = { 0: "Inaccessible", 1: "Private Land", 2: "With Permission", 3: "Public" };
+const STATUS_LABELS = { 1: "Inactive", 2: "Active" };
+
+const CEMETERY_COLUMNS = [
+    { key: "name",     label: "Name",        type: "text" },
+    { key: "id",       label: "ID",          type: "text" },
+    { key: "township", label: "Township",    type: "text" },
+    { key: "est",      label: "Established", type: "number" },
+    { key: "access",   label: "Access",      type: "number" },
+    { key: "status",   label: "Status",      type: "number" },
+    { key: "count",    label: "Graves",      type: "number" }
+];
+
+
+// ============================================================
+// DOM + STATE
+// ============================================================
+
+const searchBox = document.getElementById("search");
+const clearSearch = document.getElementById("clear-search");
+const cemeteryButton = document.getElementById("view-cemeteries");
+const peopleButton = document.getElementById("view-people");
+const veteransButton = document.getElementById("veterans-only");
+const letterBar = document.getElementById("letter-bar");
+const mobileSort = document.getElementById("mobile-sort");
+const sortSelect = document.getElementById("sort-select");
+const sortDirectionButton = document.getElementById("sort-direction");
+const statusLine = document.getElementById("status");
+const cemeteriesSection = document.getElementById("cemeteries-section");
+const cemeteriesTable = document.getElementById("cemeteries-table");
+const cemeteriesMessage = document.getElementById("cemeteries-message");
+const peopleSection = document.getElementById("people-section");
+const peopleTable = document.getElementById("people-table");
+const peopleMessage = document.getElementById("people-message");
+const showMoreButton = document.getElementById("show-more");
+
+let cemeteries = [];
+let people = [];
+let intermentsFailed = false;
+let dataReady = false;
+
+let view = "cemeteries";
+let sortKey = "name";
+let sortDirection = 1;           // 1 = ascending, -1 = descending
+let veteransOnly = false;
+let letterFilter = "";           // "" = all letters
+let peopleLimit = PEOPLE_PAGE_SIZE;
+
+const searchByView = { cemeteries: "", people: "" };
+
+document.getElementById("back-link").href = MAP_PAGE;
+
+
+// ============================================================
+// SMALL HELPERS
+// ============================================================
+
+function escapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function cleanString(value) {
+    return String(value == null ? "" : value).trim();
+}
+
+function compareText(a, b) {
+    return String(a || "").localeCompare(String(b || ""), undefined, {
+        sensitivity: "base",
+        numeric: true
+    });
+}
+
+function mapLink(cemeteryID) {
+    return MAP_PAGE + "?cemetery=" + encodeURIComponent(cemeteryID);
+}
+
+function cell(label, html) {
+    return '<td role="cell" data-label="' + escapeHtml(label) + '">' + html + "</td>";
+}
+
+// "smith, john", "John Smith" and "smith john" all match the same person.
+function searchTerms(text) {
+    return String(text || "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+}
+
+function matchesTerms(blob, terms) {
+    return terms.every(function (term) {
+        return blob.indexOf(term) !== -1;
+    });
+}
+
+function loadCsv(path) {
+    return new Promise(function (resolve, reject) {
+        Papa.parse(new URL(path, document.baseURI).href, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function (results) { resolve(results.data); },
+            error: function (error) { reject(error); }
+        });
+    });
+}
+
+function updateUrl() {
+    try {
+        history.replaceState(
+            null, "",
+            window.location.href.split(/[?#]/)[0] + (view === "people" ? "?view=people" : "")
+        );
+    }
+    catch (error) {
+        // Blocked in some browsers (for example a file opened from disk).
+    }
+}
+
+
+// ============================================================
+// DATA
+// ============================================================
+
+function numberOrNull(value, min, max) {
+    const n = parseInt(value, 10);
+
+    if (isNaN(n) || n < min || n > max) {
+        return null;
+    }
+
+    return n;
+}
+
+function buildCemeteries(rows, veteranCemeteries) {
+
+    return rows
+        .filter(function (row) {
+            return cleanString(row.ID) !== "" && cleanString(row.NAME) !== "";
+        })
+        .map(function (row) {
+
+            const id = cleanString(row.ID);
+            const name = cleanString(row.NAME);
+            const other = cleanString(row["OTHER NAMES"]);
+            const township = cleanString(row.TOWNSHIP);
+
+            return {
+                id: id,
+                name: name,
+                township: township,
+                est: numberOrNull(row["EST."], 1, 9999),
+                access: numberOrNull(row.ACCESS, 0, 3),
+                status: numberOrNull(row.STATUS, 1, 2),
+                count: numberOrNull(row.COUNT, 0, 1e9),
+                vets: parseInt(row.VETS, 10),
+                hasVeteran: veteranCemeteries[id] === true,
+                mapped: !isNaN(parseFloat(row.LAT)) && !isNaN(parseFloat(row.LONG)),
+                blob: (name + " " + other + " " + township + " " + id).toLowerCase()
+            };
+        });
+}
+
+function buildPeople(rows, cemeteryNames) {
+
+    const list = [];
+
+    rows.forEach(function (row) {
+
+        const cemeteryID = cleanString(row.CEMETERY_ID);
+
+        if (!cemeteryID) {
+            return;
+        }
+
+        const first = cleanString(row["FIRST NAME"]);
+        const last = cleanString(row["LAST NAME"]);
+        const cemeteryName = cemeteryNames[cemeteryID] || "";
+
+        const base = last.normalize("NFD").charAt(0).toUpperCase();
+
+        list.push({
+            first: first,
+            last: last,
+            birth: cleanString(row.BIRTH),
+            death: cleanString(row.DEATH),
+            cemeteryID: cemeteryID,
+            cemeteryName: cemeteryName,
+            veteran: cleanString(row.VETERAN) === "1",
+            war: cleanString(row.WAR),
+            pioneer: cleanString(row.PIONEER) === "1",
+            letter: /[A-Z]/.test(base) ? base : "#",
+            blob: (first + " " + last + " " + last + " " + first + " " + cemeteryName + " " + cemeteryID).toLowerCase()
+        });
+    });
+
+    // Last names that don't start with a letter (or are missing) go to the end, under "#".
+    list.sort(function (a, b) {
+        return ((a.letter === "#") - (b.letter === "#")) ||
+               compareText(a.last, b.last) ||
+               compareText(a.first, b.first) ||
+               compareText(a.birth, b.birth);
+    });
+
+    return list;
+}
+
+
+// ============================================================
+// CEMETERIES VIEW
+// ============================================================
+
+function compareCemeteries(a, b) {
+
+    const column = CEMETERY_COLUMNS.find(function (c) { return c.key === sortKey; });
+    const x = a[sortKey];
+    const y = b[sortKey];
+
+    const xUnknown = x === null || x === "";
+    const yUnknown = y === null || y === "";
+
+    // Unknown values always sort to the bottom, in either direction.
+    if (xUnknown && yUnknown) { return compareText(a.name, b.name); }
+    if (xUnknown) { return 1; }
+    if (yUnknown) { return -1; }
+
+    const primary = column.type === "number" ? x - y : compareText(x, y);
+
+    return primary !== 0 ? sortDirection * primary : compareText(a.name, b.name);
+}
+
+function renderCemeteries() {
+
+    const terms = searchTerms(searchBox.value);
+
+    const rows = cemeteries.filter(function (c) {
+
+        if (veteransOnly && !(c.vets === 1 || c.hasVeteran)) {
+            return false;
+        }
+
+        return matchesTerms(c.blob, terms);
+    });
+
+    rows.sort(compareCemeteries);
+
+    const head = CEMETERY_COLUMNS.map(function (column) {
+
+        const active = column.key === sortKey;
+        const ariaSort = active ? (sortDirection === 1 ? "ascending" : "descending") : "none";
+        const arrow = active ? (sortDirection === 1 ? "\u25B2" : "\u25BC") : "";
+
+        return '<th scope="col" role="columnheader" aria-sort="' + ariaSort + '">' +
+               '<button type="button" class="sort-button" data-sort="' + column.key + '">' +
+               escapeHtml(column.label) +
+               ' <span class="sort-arrow" aria-hidden="true">' + arrow + "</span></button></th>";
+    }).join("");
+
+    const body = rows.map(function (c) {
+
+        const nameHtml = c.mapped
+            ? '<a href="' + escapeHtml(mapLink(c.id)) + '">' + escapeHtml(c.name) + "</a>"
+            : escapeHtml(c.name) + ' <span class="muted">(not yet mapped)</span>';
+
+        return '<tr role="row">' +
+            cell("Name", nameHtml) +
+            cell("ID", escapeHtml(c.id)) +
+            cell("Township", escapeHtml(c.township || "Unknown")) +
+            cell("Established", c.est === null ? "Unknown" : escapeHtml(c.est)) +
+            cell("Access", escapeHtml(c.access === null ? "Unknown" : ACCESS_LABELS[c.access])) +
+            cell("Status", escapeHtml(c.status === null ? "Unknown" : STATUS_LABELS[c.status])) +
+            cell("Graves", c.count === null ? "Unknown" : escapeHtml(c.count)) +
+            "</tr>";
+    }).join("");
+
+    cemeteriesTable.innerHTML =
+        '<caption class="sr-only">Cemeteries. Column headings are buttons that sort the list.</caption>' +
+        '<thead role="rowgroup"><tr role="row">' + head + "</tr></thead>" +
+        '<tbody role="rowgroup">' + body + "</tbody>";
+
+    cemeteriesTable.hidden = rows.length === 0;
+    cemeteriesMessage.hidden = rows.length !== 0;
+    cemeteriesMessage.textContent = cemeteries.length === 0
+        ? "No cemeteries have been entered yet."
+        : "No cemeteries match your search.";
+
+    statusLine.textContent = "Showing " + rows.length.toLocaleString() + " of " +
+        cemeteries.length.toLocaleString() + " cemeteries";
+
+    sortSelect.value = sortKey;
+    sortDirectionButton.textContent = sortDirection === 1 ? "A \u2192 Z \u25B2" : "Z \u2192 A \u25BC";
+}
+
+
+// ============================================================
+// PEOPLE VIEW
+// ============================================================
+
+function filteredPeople(applyLetter) {
+
+    const terms = searchTerms(searchBox.value);
+
+    return people.filter(function (person) {
+
+        if (veteransOnly && !person.veteran) {
+            return false;
+        }
+
+        if (applyLetter && letterFilter && person.letter !== letterFilter) {
+            return false;
+        }
+
+        return matchesTerms(person.blob, terms);
+    });
+}
+
+function renderLetterBar() {
+
+    const present = {};
+
+    filteredPeople(false).forEach(function (person) {
+        present[person.letter] = true;
+    });
+
+    if (letterFilter && !present[letterFilter]) {
+        letterFilter = "";
+    }
+
+    const letters = Object.keys(present).sort(function (a, b) {
+        if (a === "#") { return 1; }
+        if (b === "#") { return -1; }
+        return a < b ? -1 : 1;
+    });
+
+    let html = '<button type="button" class="toggle' + (letterFilter === "" ? " active" : "") +
+               '" data-letter="" aria-pressed="' + (letterFilter === "") + '">All</button>';
+
+    letters.forEach(function (letter) {
+        const active = letterFilter === letter;
+        html += '<button type="button" class="toggle' + (active ? " active" : "") +
+                '" data-letter="' + escapeHtml(letter) + '" aria-pressed="' + active + '">' +
+                escapeHtml(letter) + "</button>";
+    });
+
+    letterBar.innerHTML = html;
+}
+
+function renderPeople() {
+
+    if (intermentsFailed) {
+        peopleTable.hidden = true;
+        showMoreButton.hidden = true;
+        peopleMessage.hidden = false;
+        peopleMessage.className = "message error-message";
+        peopleMessage.textContent = "The people records (" + INTERMENT_CSV + ") could not be loaded.";
+        statusLine.textContent = "";
+        letterBar.innerHTML = "";
+        return;
+    }
+
+    peopleMessage.className = "message";
+
+    renderLetterBar();
+
+    const rows = filteredPeople(true);
+    const shown = rows.slice(0, peopleLimit);
+
+    const head = ["Name", "Born", "Died", "Cemetery", "Notes"].map(function (label) {
+        return '<th scope="col" role="columnheader">' + label + "</th>";
+    }).join("");
+
+    const body = shown.map(function (person) {
+
+        let name;
+
+        if (person.last && person.first) { name = person.last + ", " + person.first; }
+        else { name = person.last || person.first || "Unnamed Interment"; }
+
+        const cemeteryHtml = person.cemeteryName
+            ? '<a href="' + escapeHtml(mapLink(person.cemeteryID)) + '">' + escapeHtml(person.cemeteryName) + "</a>"
+            : escapeHtml(person.cemeteryID);
+
+        let notes = "";
+
+        if (person.veteran) {
+            notes += '<span class="tag">Veteran' + (person.war ? " (" + escapeHtml(person.war) + ")" : "") + "</span>";
+        }
+
+        if (person.pioneer) {
+            notes += '<span class="tag">Pioneer</span>';
+        }
+
+        return '<tr role="row">' +
+            cell("Name", "<strong>" + escapeHtml(name) + "</strong>") +
+            cell("Born", escapeHtml(person.birth)) +
+            cell("Died", escapeHtml(person.death)) +
+            cell("Cemetery", cemeteryHtml) +
+            cell("Notes", notes) +
+            "</tr>";
+    }).join("");
+
+    peopleTable.innerHTML =
+        '<caption class="sr-only">People, sorted by last name</caption>' +
+        '<thead role="rowgroup"><tr role="row">' + head + "</tr></thead>" +
+        '<tbody role="rowgroup">' + body + "</tbody>";
+
+    peopleTable.hidden = rows.length === 0;
+    peopleMessage.hidden = rows.length !== 0;
+    peopleMessage.textContent = people.length === 0
+        ? "No people records have been entered yet."
+        : "No people match your search.";
+
+    const remaining = rows.length - shown.length;
+
+    showMoreButton.hidden = remaining <= 0;
+    showMoreButton.textContent = "Show " + Math.min(PEOPLE_PAGE_SIZE, remaining).toLocaleString() +
+        " more (" + remaining.toLocaleString() + " remaining)";
+
+    statusLine.textContent = "Showing " + shown.length.toLocaleString() + " of " +
+        rows.length.toLocaleString() + " people" +
+        (rows.length !== people.length ? " (" + people.length.toLocaleString() + " total)" : "");
+}
+
+
+// ============================================================
+// RENDER + CONTROLS
+// ============================================================
+
+function render() {
+
+    const isPeople = view === "people";
+
+    cemeteryButton.classList.toggle("active", !isPeople);
+    cemeteryButton.setAttribute("aria-pressed", String(!isPeople));
+    peopleButton.classList.toggle("active", isPeople);
+    peopleButton.setAttribute("aria-pressed", String(isPeople));
+
+    cemeteriesSection.hidden = isPeople;
+    peopleSection.hidden = !isPeople;
+    letterBar.hidden = !isPeople;
+    mobileSort.hidden = isPeople;
+
+    searchBox.placeholder = isPeople
+        ? "Search people by name or cemetery..."
+        : "Search cemeteries by name, township or ID...";
+
+    clearSearch.hidden = searchBox.value === "";
+
+    if (!dataReady) {
+        return;
+    }
+
+    if (isPeople) { renderPeople(); }
+    else { renderCemeteries(); }
+}
+
+function setView(newView) {
+
+    if (newView === view) {
+        return;
+    }
+
+    searchByView[view] = searchBox.value;
+    view = newView;
+    searchBox.value = searchByView[view];
+    peopleLimit = PEOPLE_PAGE_SIZE;
+
+    updateUrl();
+    render();
+}
+
+cemeteryButton.addEventListener("click", function () { setView("cemeteries"); });
+peopleButton.addEventListener("click", function () { setView("people"); });
+
+veteransButton.addEventListener("click", function () {
+    veteransOnly = !veteransOnly;
+    veteransButton.classList.toggle("active", veteransOnly);
+    veteransButton.setAttribute("aria-pressed", String(veteransOnly));
+    peopleLimit = PEOPLE_PAGE_SIZE;
+    render();
+});
+
+searchBox.addEventListener("input", function () {
+    peopleLimit = PEOPLE_PAGE_SIZE;
+    render();
+});
+
+clearSearch.addEventListener("click", function () {
+    searchBox.value = "";
+    peopleLimit = PEOPLE_PAGE_SIZE;
+    render();
+    searchBox.focus();
+});
+
+cemeteriesTable.addEventListener("click", function (event) {
+
+    const button = event.target.closest(".sort-button");
+
+    if (!button) {
+        return;
+    }
+
+    const key = button.dataset.sort;
+
+    if (key === sortKey) {
+        sortDirection = -sortDirection;
+    }
+    else {
+        sortKey = key;
+        sortDirection = 1;
+    }
+
+    render();
+
+    // Rebuilding the table drops keyboard focus, so put it back.
+    const again = cemeteriesTable.querySelector('[data-sort="' + key + '"]');
+    if (again) { again.focus(); }
+});
+
+sortSelect.innerHTML = CEMETERY_COLUMNS.map(function (column) {
+    return '<option value="' + column.key + '">' + escapeHtml(column.label) + "</option>";
+}).join("");
+
+sortSelect.addEventListener("change", function () {
+    sortKey = sortSelect.value;
+    sortDirection = 1;
+    render();
+});
+
+sortDirectionButton.addEventListener("click", function () {
+    sortDirection = -sortDirection;
+    render();
+});
+
+letterBar.addEventListener("click", function (event) {
+
+    const button = event.target.closest("[data-letter]");
+
+    if (!button) {
+        return;
+    }
+
+    letterFilter = button.dataset.letter;
+    peopleLimit = PEOPLE_PAGE_SIZE;
+    render();
+
+    const again = letterBar.querySelector('[data-letter="' + letterFilter + '"]');
+    if (again) { again.focus(); }
+});
+
+showMoreButton.addEventListener("click", function () {
+    peopleLimit += PEOPLE_PAGE_SIZE;
+    render();
+});
+
+
+// ============================================================
+// LOAD
+// ============================================================
+
+if (new URLSearchParams(window.location.search).get("view") === "people") {
+    view = "people";
+}
+
+render();
+
+loadCsv(CEMETERY_CSV)
+    .then(function (cemeteryRows) {
+
+        return loadCsv(INTERMENT_CSV)
+            .catch(function (error) {
+                console.error(INTERMENT_CSV + " loading error:", error);
+                intermentsFailed = true;
+                return [];
+            })
+            .then(function (intermentRows) {
+
+                const cemeteryNames = {};
+                const veteranCemeteries = {};
+
+                cemeteryRows.forEach(function (row) {
+                    const id = cleanString(row.ID);
+                    if (id) { cemeteryNames[id] = cleanString(row.NAME); }
+                });
+
+                intermentRows.forEach(function (row) {
+                    if (cleanString(row.VETERAN) === "1") {
+                        veteranCemeteries[cleanString(row.CEMETERY_ID)] = true;
+                    }
+                });
+
+                cemeteries = buildCemeteries(cemeteryRows, veteranCemeteries);
+                people = buildPeople(intermentRows, cemeteryNames);
+
+                dataReady = true;
+                render();
+            });
+    })
+    .catch(function (error) {
+        console.error(CEMETERY_CSV + " loading error:", error);
+        statusLine.textContent = "";
+        cemeteriesMessage.hidden = false;
+        cemeteriesMessage.className = "message error-message";
+        cemeteriesMessage.textContent =
+            "Unable to load " + CEMETERY_CSV + ". Make sure it is in the same folder as this page.";
+        peopleMessage.hidden = false;
+        peopleMessage.className = "message error-message";
+        peopleMessage.textContent = "Unable to load the records.";
+    });
+
+</script>
+</body>
+</html>

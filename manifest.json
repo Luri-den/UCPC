@@ -1,0 +1,8 @@
+{
+  "name": "Franklin County Pioneer Cemeteries Archive",
+  "short_name": "FC Cemeteries",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#01796F"
+}
