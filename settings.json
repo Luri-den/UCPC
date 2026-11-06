@@ -3,10 +3,10 @@
   "shortName": "UC",
   "idPrefix": "UC",
   "center": [
-    -84.8621418,
-    39.6253112
+    -84.9308506,
+    39.6354214
   ],
-  "zoom": 10.73,
+  "zoom": 11.25,
   "colors": {
     "accent": "#400080",
     "public": "#01796F",
@@ -27,5 +27,15 @@
   "entranceSizes": [
     "primary",
     "secondary"
+  ],
+  "maxBounds": [
+    [
+      -85.1761,
+      39.486
+    ],
+    [
+      -84.6065,
+      39.7641
+    ]
   ]
 }
