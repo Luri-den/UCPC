@@ -710,6 +710,7 @@ function loadCemetery() {
                 // LOAD PHOTOS
                 // ------------------------------------------------
 
+                window.cemeteryRow = cemetery;
                 loadPhotos();
 
 
@@ -731,6 +732,11 @@ function loadCemetery() {
 // LOAD CEMETERY PHOTOS
 // ============================================================
 
+function photoNum(p) { const m = /-(\d)\.[a-z]+$/i.exec(p); return m ? +m[1] : 1; }
+function photoCaption(p) {
+    const r = window.cemeteryRow || {}, n = photoNum(p);
+    return String(r["PHOTO" + n + "_CAPTION"] || "").trim() || (n === 1 ? "Entrance" : "");
+}
 function loadPhotos() {
 
 
@@ -878,18 +884,13 @@ let completed = 0;
 
         container.innerHTML =
 
-            validPhotos.map(
+            validPhotos.slice().sort(function (a, b) { return photoNum(a) - photoNum(b); }).map(
                 function(photoPath) {
 
 
                     return `
 
-                        <img
-                            src="${photoPath}"
-                            alt="Cemetery photograph"
-                            class="cemetery-photo"
-                            onclick="openLightbox('${photoPath}')"
-                        >
+                        <figure style="margin:0 0 12px;display:inline-block;max-width:100%"><img src="${photoPath}" alt="${photoCaption(photoPath) || 'Cemetery photograph'}" class="cemetery-photo" onclick="openLightbox('${photoPath}')"><figcaption style="font-size:13px;color:#555;margin-top:2px">${photoCaption(photoPath)}</figcaption></figure>
 
                     `;
 

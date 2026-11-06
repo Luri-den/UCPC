@@ -3471,7 +3471,7 @@ function showCemeteryPanel(feature) {
 
         <h3>Condition Status</h3>
         <p>${escapeHtml(props.Condition_Notes || "No condition information on file.")}</p>
-        ${props.Hazards === true || props.Hazards === "true" ? "<p><strong>Caution:</strong> Hazards have been noted at this cemetery. Use care.</p>" : ""}
+        ${props.Hazards === true || props.Hazards === "true" ? "<p><strong>Caution:</strong> Hazards have been noted at this cemetery" + (props.Hazard_Details ? ": " + escapeHtml(props.Hazard_Details) : "") + ". Use care.</p>" : ""}
 
         <h3>Location Notes</h3>
         <p>${escapeHtml(props.General_Notes || "No notes currently recorded.")}</p>
@@ -5194,6 +5194,7 @@ map.on("load", function () {
                         Grave_Recorded: row._REC === "" || row._REC === undefined ? -1 : (parseInt(row._REC, 10) || 0),
                         Grave_Estimate: row._EST === "" || row._EST === undefined ? -1 : (parseInt(row._EST, 10) || 0),
                         Hazards: row._HAZARDS === true,
+                        Hazard_Details: row.HAZARD_DETAILS || "",
                         Hide_Location: parseInt(row.HIDE, 10) === 1,
                         Location_Details: row.LOCATION_DETAILS || "",
                         Search_Match: false,

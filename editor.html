@@ -103,9 +103,11 @@ const fix = p => [+p[0].toFixed(7), +p[1].toFixed(7)];
 
 const ACC = [["3","public","Public"],["2","permission","With permission"],["1","private","Private land"],["0","inaccessible","Inaccessible"]];
 const YN = [["","Unknown"],["1","Yes"],["0","No"]];
-const CEMF = [["NAME","Name"],["OTHER_NAMES","Other names"],["TOWNSHIP","Township"],["ESTABLISHED","Year established"],
+const CEMF = [["NAME","Name"],["OTHER_NAMES","Other names"],["TOWNSHIP","Township"],["PLSS","Section, Township, Range (for example S34, T12N, R12E)"],["ESTABLISHED","Year established"],
   ["ACCESS","Can visitors get in?","sel",[["","Unknown"]].concat(ACC.map(a => [a[0], a[2]]))],
   ["ACTIVE","Still in use?","sel",YN],["VETERANS","Veterans buried here?","sel",YN],["PIONEERS","Pioneers buried here?","sel",YN],
+  ["CONDITION","Condition","sel",[["","Not recorded"],["Unknown","Unknown"],["3","Good"],["2","Fair"],["1","Poor"],["0","Extreme damage or lost"]]],
+  ["GRAVES_ESTIMATE","Estimated grave count"],["GRAVE_RECORDED","Official grave count (stones recorded)"],["SHAARD_ID","SHAARD ID"],
   ["SIZE","Size"],["PUBLIC_NOTES","Notes shown to visitors","area"],["LOCATION_DETAILS","How to find it","area"]];
 const GRF = [["FIRST NAME","First name"],["LAST NAME","Last name"],["BIRTH","Born"],["DEATH","Died"],
   ["SEX","Sex","sel",[["","Unknown"],["F","Female"],["M","Male"]]],["WAR","War"],["VET DETAILS","Veteran details"],
@@ -121,10 +123,11 @@ const FILES_DEF = { cemeteries:"cemlist.csv", interments:"interments.csv", bound
 // ---------- state ----------
 let S, cems, cemF, ints, intF, bounds, county, dir, sel, selG, mode, ready, tmp = [];
 const dirty = new Set();
+const photos = new Map();   // pending photos: path in the repository -> image Blob
 function blank() {
   S = { name:"", shortName:"", idPrefix:"FC", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
   cems = []; cemF = CEM_DEF.slice(); ints = []; intF = INT_DEF.slice();
-  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear();
+  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear();
 }
 blank();
 const cem = () => cems.find(r => r.ID === sel);
@@ -298,6 +301,50 @@ function flags(box, row) {
   } }), " " + label])));
 }
 
+// ---------- hazards ----------
+const HAZ = ["Uneven or sunken ground", "Steep slope", "Poison ivy or heavy brush", "Livestock", "Ticks or snakes", "Fallen or broken stones", "Open or damaged vault", "Flooding or mud"];
+function hazardBox(box, r) {
+  const parts = (r.HAZARD_DETAILS || "").split(";").map(x => x.trim()).filter(Boolean);
+  const b = el("div", { className:"box" }, [el("b", { textContent:"Hazards" })]);
+  const any = el("input", { type:"checkbox", checked:r.HAZARDS === "1" });
+  const boxes = HAZ.map(h => el("input", { type:"checkbox", checked:parts.includes(h) }));
+  const other = el("input", { value:parts.filter(x => !HAZ.includes(x)).join("; "), placeholder:"Other hazard (optional)" });
+  const save = () => {
+    const list = HAZ.filter((h, i) => boxes[i].checked).concat(other.value.trim() ? [other.value.trim()] : []);
+    if (list.length) any.checked = true;
+    r.HAZARDS = any.checked ? "1" : ""; r.HAZARD_DETAILS = any.checked ? list.join("; ") : "";
+    ["HAZARDS", "HAZARD_DETAILS"].forEach(f => { if (!cemF.includes(f)) cemF.push(f); });
+    touch("cem");
+  };
+  b.append(el("label", {}, [any, " Hazards have been noted here"]));
+  HAZ.forEach((h, i) => b.append(el("label", {}, [boxes[i], " " + h])));
+  b.append(other);
+  [any, other].concat(boxes).forEach(x => x.onchange = save);
+  box.append(b);
+}
+
+// ---------- photos ----------
+async function shrink(file, max = 1600) {
+  const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = el("canvas", { width:Math.round(bmp.width * k), height:Math.round(bmp.height * k) });
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+}
+function photoBox(box, path, label) {
+  const b = el("div", { className:"box" }, [el("b", { textContent:label })]), exts = ["jpg", "jpeg", "png", "webp", "gif"];
+  const img = el("img", { style:"max-width:100%;max-height:160px;display:block;margin:6px 0" }); let k = 0;
+  const show = () => { img.hidden = false; img.src = photos.has(path) ? URL.createObjectURL(photos.get(path)) : path.replace(/\.jpg$/, "." + exts[k]); };
+  img.onerror = () => { if (!photos.has(path) && ++k < exts.length) show(); else img.hidden = true; };
+  show();
+  const f = el("input", { type:"file", accept:"image/*", hidden:true, onchange:async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try { photos.set(path, await shrink(file)); touch("photos"); k = 0; show(); say("Photo ready. It goes up with Publish (or Save)."); }
+    catch (err) { say("Couldn't read that picture: " + err.message); } } });
+  b.append(img, f, el("button", { textContent:"Choose photo…", onclick:() => f.click() }),
+    el("div", {}, [el("small", { textContent:"Saved as " + path + ". A new photo replaces the old one." })]));
+  box.append(b);
+}
+
 // ---------- Cemeteries tab ----------
 function pick(id) {
   sel = id; selG = null; setMode(null); refresh();
@@ -319,6 +366,11 @@ function drawCem() {
   if (!ll(r)) box.append(el("button", { className:"go", textContent:"Place it on the map", onclick:() => setMode("putCem", "Click the map to place this cemetery.") }));
   else box.append(el("small", { textContent:"Drag the yellow pin on the map to move it." }));
   form(box, r, CEMF, "cem", cemF);
+  hazardBox(box, r);
+  [["", "Entrance photo (shown first)"], ["-2", "Photo 2"], ["-3", "Photo 3"]].forEach(([sfx, label], i) => {
+    photoBox(box, "photos/" + r.ID + sfx + ".jpg", label);
+    form(box.lastChild, r, [["PHOTO" + (i + 1) + "_CAPTION", "Caption (optional)"]], "cem", cemF);
+  });
 
   const f = holder(sel), b = el("div", { className:"box" }, [el("b", { textContent:"Boundary" })]);
   b.append(el("div", { className:"row" }, [
@@ -365,6 +417,8 @@ function drawGrv() {
     if (ll(selG)) box.append(el("small", { textContent:"Drag the blue pin on the map to move it." }));
     else box.append(el("button", { textContent:"Place on map", onclick:() => setMode("putGrave", "Click the map to place this grave.") }));
     form(box, selG, GRF, "ints", intF); flags(box, selG);
+    if (selG.MARKER_ID) photoBox(box, "photos/gravepics/" + selG.MARKER_ID + "-1.jpg", "Grave photo");
+    else box.append(el("small", { textContent:"This grave has no marker ID, so it can't have a photo yet." }));
     box.append(el("p", {}, [el("button", { className:"bad", textContent:"Delete this grave", onclick:() => {
       if (!confirm("Delete this grave record?")) return; ints = ints.filter(x => x !== selG); selG = null; touch("ints"); refresh(); } })]));
   }
@@ -490,20 +544,21 @@ function outFiles() {
   if (dirty.has("ints")) o.push([S.files.interments, Papa.unparse(ints, { columns:intF })]);
   if (dirty.has("bounds")) o.push([S.files.boundaries, JSON.stringify(bounds, null, 1)]);
   if (dirty.has("county") && county) o.push([S.files.county, JSON.stringify(county, null, 1)]);
+  photos.forEach((blob, path) => o.push([path, blob]));
   return o;
 }
 const dl = (n, t) => el("a", { href:URL.createObjectURL(new Blob([t])), download:n }).click();
-function clean() { dirty.clear(); $("#save").disabled = true; $("#save").className = ""; }
+function clean() { dirty.clear(); photos.clear(); $("#save").disabled = true; $("#save").className = ""; }
 async function put(name, text) {
-  if (dir) { const w = await (await dir.getFileHandle(name, { create:true })).createWritable(); await w.write(text); await w.close(); }
-  else { dl(name, text); await new Promise(r => setTimeout(r, 400)); }
+  if (dir) { let d = dir; const parts = name.split("/"); for (const q of parts.slice(0, -1)) d = await d.getDirectoryHandle(q, { create:true }); const w = await (await d.getFileHandle(parts.pop(), { create:true })).createWritable(); await w.write(text); await w.close(); }
+  else { dl(name.split("/").pop(), text); await new Promise(r => setTimeout(r, 400)); }
 }
 $("#save").onclick = async () => {
   try {
     if (!dir && window.showDirectoryPicker && confirm("Choose the folder to save into (your map folder).")) dir = await showDirectoryPicker({ mode:"readwrite" });
     for (const [n, t] of outFiles()) await put(n, t);
     clean();
-    say(dir ? "Saved into your folder." : "Saved. Your browser put the files in Downloads: copy them over the old ones in your map folder.");
+    say(dir ? "Saved into your folder." : "Saved. Your browser put the files in Downloads: copy them into your map folder (photos go in the photos folder, grave photos in photos/gravepics).");
   } catch (e) { if (e.name !== "AbortError") say("Save failed: " + e.message); }
 };
 // Hidden button: the GitHub publisher "presses" it to collect the files (see publish.js)
@@ -522,6 +577,6 @@ async function loadFromSite() {
 loadFromSite();
 </script>
 <script src="publish.js"></script>
-<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
+<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 </body>
 </html>
