@@ -1057,6 +1057,7 @@ const map = new maplibregl.Map({
     container: "map",
     style: {
         version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",   // fonts for text labels (entrance names)
         sources: {
 
             "osm-tiles": {
@@ -5119,6 +5120,7 @@ map.on("load", function () {
         layout: {
             visibility: "none",
             "text-field": ["coalesce", ["get", "LABEL"], "Entrance"],
+            "text-font": ["Open Sans Regular"],
             "text-size": 11,
             "text-offset": [0, 1.45],
             "text-anchor": "top",
