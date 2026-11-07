@@ -677,7 +677,7 @@ function loadCemetery() {
                             Approximate Size:
                         </span>
 
-                        ${cemetery["APPROXIMATE SIZE"] || "N/A"}
+                        ${cemEsc(cemetery["APPROXIMATE SIZE"] || cemetery.SIZE) || "N/A"}
 
                     </div>
 
@@ -688,9 +688,21 @@ function loadCemetery() {
                             Condition:
                         </span>
 
-                        ${cemetery.CONDITION || "N/A"}
+                        ${cemEsc(({ "0": "Extreme Damage or Lost", "1": "Poor", "2": "Fair", "3": "Good" })[String(cemetery.CONDITION).trim()] || cemetery.CONDITION) || "N/A"}
 
                     </div>
+
+                    ${String(cemetery.HAZARDS).trim() === "1" ? `
+                    <div class="field">
+                        <span class="label">Hazards:</span>
+                        ${cemEsc(cemetery.HAZARD_DETAILS) || "Yes"}
+                    </div>` : ""}
+
+                    ${String(cemetery.FENCE).trim() === "1" ? `
+                    <div class="field">
+                        <span class="label">Fence:</span>
+                        ${cemEsc(cemetery.FENCE_TYPES) || "Yes"}
+                    </div>` : ""}
 
 
                     <div class="field">
@@ -699,7 +711,7 @@ function loadCemetery() {
                             Notes:
                         </span>
 
-                        ${cemetery.NOTES || "N/A"}
+                        ${cemEsc(cemetery.NOTES || cemetery.PUBLIC_NOTES) || "N/A"}
 
                     </div>
 
@@ -732,6 +744,7 @@ function loadCemetery() {
 // LOAD CEMETERY PHOTOS
 // ============================================================
 
+function cemEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 function photoNum(p) { const m = /-(\d)\.[a-z]+$/i.exec(p); return m ? +m[1] : 1; }
 function photoCaption(p) {
     const r = window.cemeteryRow || {}, n = photoNum(p);
@@ -1427,6 +1440,13 @@ function displayInterments(
                             </span>
 
                         </div>
+
+                        ${row.STONE_TYPE ? `
+                        <div class="field">
+                            <span class="label">Stone Type:</span>
+                            <span>${cemEsc(row.STONE_TYPE)}</span>
+                        </div>` : ""}
+
 
 
                         <div class="field">
