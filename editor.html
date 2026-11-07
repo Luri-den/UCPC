@@ -49,44 +49,44 @@ small{color:#6b6258}
 <body>
 <aside>
   <div class="top">
-    <button id="open" class="go" style="background:#fff;color:#01796F">Open my map files</button>
-    <button id="new">New county</button>
-    <button id="save" disabled>Save to folder</button><button id="dlBtn" hidden>Download</button>
-    <div id="msg">Click “Open my map files” and pick your map folder to begin.</div>
+    <button id="open" class="go" style="background:#fff;color:#01796F">Open My Map Files</button>
+    <button id="new">New County</button>
+    <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
+    <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
   </div>
   <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button></div>
 
   <div class="pane on" id="set">
-    <label>Map name</label><input id="sname">
-    <label>Short name (for phones)</label><input id="sshort">
-    <label>Cemetery ID letters (new cemeteries become e.g. FC156)</label><input id="spre" maxlength="6">
+    <label>Map Name</label><input id="sname">
+    <label>Short Name (Mobile)</label><input id="sshort">
+    <label>Cemetery ID Letters (New Cemetery ID System, i.e. FC001)</label><input id="spre" maxlength="6">
     <h3>Colors</h3><div id="cols"></div>
-    <h3>Starting view</h3>
-    <small>Move and zoom the map to how visitors should first see it, then press the button.</small>
-    <div class="row"><button id="setview">Use what I'm looking at now</button></div>
+    <h3>Starting View</h3>
+    <small>Zoom and move the map to how you feel visitors should first see it, then press the button.</small>
+    <div class="row"><button id="setview">Use What I'm Looking At Now</button></div>
     <small id="viewtxt"></small>
-    <h3>County or town outline</h3>
-    <small>Pick a county, town or state and the official US Census outline is fetched for you. It also sets the start view and allowed area.</small>
-    <div class="row"><select id="stype"><option value="COUNTY">County</option><option value="PLACE">Town / city</option><option value="STATE">State</option></select><select id="sstate"><option value="">— State —</option><option value="01">AL</option><option value="02">AK</option><option value="04">AZ</option><option value="05">AR</option><option value="06">CA</option><option value="08">CO</option><option value="09">CT</option><option value="10">DE</option><option value="11">DC</option><option value="12">FL</option><option value="13">GA</option><option value="15">HI</option><option value="16">ID</option><option value="17">IL</option><option value="18">IN</option><option value="19">IA</option><option value="20">KS</option><option value="21">KY</option><option value="22">LA</option><option value="23">ME</option><option value="24">MD</option><option value="25">MA</option><option value="26">MI</option><option value="27">MN</option><option value="28">MS</option><option value="29">MO</option><option value="30">MT</option><option value="31">NE</option><option value="32">NV</option><option value="33">NH</option><option value="34">NJ</option><option value="35">NM</option><option value="36">NY</option><option value="37">NC</option><option value="38">ND</option><option value="39">OH</option><option value="40">OK</option><option value="41">OR</option><option value="42">PA</option><option value="44">RI</option><option value="45">SC</option><option value="46">SD</option><option value="47">TN</option><option value="48">TX</option><option value="49">UT</option><option value="50">VT</option><option value="51">VA</option><option value="53">WA</option><option value="54">WV</option><option value="55">WI</option><option value="56">WY</option><option value="60">AS</option><option value="66">GU</option><option value="69">MP</option><option value="72">PR</option><option value="78">VI</option></select></div>
+    <h3>County or Town Outline</h3>
+    <small>Pick a county, town or state and the official US Census outline is fetched for you! It also sets the start view and allowed area based on size.</small>
+    <div class="row"><select id="stype"><option value="COUNTY">County</option><option value="PLACE">Town / City</option><option value="STATE">State</option></select><select id="sstate"><option value="">— State —</option><option value="01">AL</option><option value="02">AK</option><option value="04">AZ</option><option value="05">AR</option><option value="06">CA</option><option value="08">CO</option><option value="09">CT</option><option value="10">DE</option><option value="11">DC</option><option value="12">FL</option><option value="13">GA</option><option value="15">HI</option><option value="16">ID</option><option value="17">IL</option><option value="18">IN</option><option value="19">IA</option><option value="20">KS</option><option value="21">KY</option><option value="22">LA</option><option value="23">ME</option><option value="24">MD</option><option value="25">MA</option><option value="26">MI</option><option value="27">MN</option><option value="28">MS</option><option value="29">MO</option><option value="30">MT</option><option value="31">NE</option><option value="32">NV</option><option value="33">NH</option><option value="34">NJ</option><option value="35">NM</option><option value="36">NY</option><option value="37">NC</option><option value="38">ND</option><option value="39">OH</option><option value="40">OK</option><option value="41">OR</option><option value="42">PA</option><option value="44">RI</option><option value="45">SC</option><option value="46">SD</option><option value="47">TN</option><option value="48">TX</option><option value="49">UT</option><option value="50">VT</option><option value="51">VA</option><option value="53">WA</option><option value="54">WV</option><option value="55">WI</option><option value="56">WY</option><option value="60">AS</option><option value="66">GU</option><option value="69">MP</option><option value="72">PR</option><option value="78">VI</option></select></div>
     <div class="row"><input id="sname2" placeholder="Name, for example Fayette"><button id="sgo" class="go">Find</button></div>
     <div class="list" id="schoose" hidden></div>
-    <div class="row"><button id="cedit">Reshape outline</button><button id="cload">Load outline file…</button></div>
-    <h3>Allowed area</h3>
-    <small>Visitors can't scroll outside this red box. The red pin is the starting point: drag it.</small>
-    <div class="row"><button id="aedit">Edit box</button><button id="afit">Fit to outline</button><button id="aview">Use screen</button></div>
+    <div class="row"><button id="cedit">Reshape Outline</button><button id="cload">Load Outline File…</button></div>
+    <h3>Allowed Area</h3>
+    <small>Visitors can't scroll outside of this red box. The Red Pin is the starting point: Drag it to change it.</small>
+    <div class="row"><button id="aedit">Edit Box</button><button id="afit">Fit to Outline</button><button id="aview">Use Screen</button></div>
     <input type="file" id="cfile" accept=".json,.geojson" hidden>
   </div>
 
   <div class="pane" id="cem">
     <input id="csearch" placeholder="Search cemeteries…">
     <div class="list" id="clist"></div>
-    <div class="row"><button id="cadd" class="go">+ Add cemetery</button></div>
+    <div class="row"><button id="cadd" class="go">+ Add Cemetery</button></div>
     <div id="cdet"></div>
   </div>
 
   <div class="pane" id="grv"><div id="gdet"></div></div>
 </aside>
-<div id="map"><div id="hint" hidden></div><button id="bm">Aerial photo</button></div>
+<div id="map"><div id="hint" hidden></div><button id="bm">Aerial View</button></div>
 <input type="file" id="files" multiple accept=".csv,.json,.geojson" hidden>
 
 <script>
@@ -113,8 +113,8 @@ const GRF = [["FIRST NAME","First name"],["LAST NAME","Last name"],["BIRTH","Bor
   ["SEX","Sex","sel",[["","Unknown"],["F","Female"],["M","Male"]]],["WAR","War"],["VET DETAILS","Veteran details"],
   ["ROW","Row"],["PLOT","Plot"],["ADDITIONAL INFORMATION ON STONE","Writing on the stone","area"]];
 const FLAGS = [["VETERAN","Veteran"],["PIONEER","Pioneer"],["MAUS","Above ground (mausoleum, vault)"]];
-const COL = [["accent","Page header"],["public","Public cemeteries"],["permission","Ask permission"],["private","Private land"],
-  ["inaccessible","Inaccessible"],["unknown","Access unknown"],["boundary","Cemetery boundary line"],["county","County outline"],["grave","Grave markers"]];
+const COL = [["accent","Page Header"],["public","Public Cemeteries"],["permission","Ask Permission"],["private","Private Land"],
+  ["inaccessible","Inaccessible"],["unknown","Access Unknown"],["boundary","Cemetery Boundary Line"],["county","County Outline"],["grave","Grave Markers"]];
 const CEM_DEF = "ID,NAME,OTHER_NAMES,SHAARD_ID,TOWNSHIP,PLSS,LAT,LONG,COORD_SOURCE,ESTABLISHED,HIDE,CONDITION,HAZARDS,ACCESS,ACTIVE,SIZE,GRAVES_ESTIMATE,GRAVE_RECORDED,VETERANS,PIONEERS,HAS_GRAVES,SURVEY_STATUS,SURVEY_DATE,PHOTOS,LAST_UPDATED,PUBLIC_NOTES,LOCATION_DETAILS".split(",");
 const INT_DEF = "CEMETERY_ID,MARKER_ID,PERSON_ID,LAST NAME,FIRST NAME,BIRTH,DEATH,ROW,PLOT,ADDITIONAL INFORMATION ON STONE,VETERAN,WAR,VET DETAILS,MAUS,LAT,LONG,PIONEER,SEX".split(",");
 const COLOR_DEF = { accent:"#01796F", public:"#01796F", permission:"#C9A227", private:"#D2691E", inaccessible:"#8B0000", unknown:"#777777", boundary:"#01796F", county:"#555555", grave:"#3f3528" };
@@ -279,7 +279,7 @@ function refresh() {
   if (mode === "bound" && ringOf(f)) vertexMarkers(ringOf(f), "bounds", "bnd", bf);
   if (mode === "county" && ringOf(county)) vertexMarkers(ringOf(county), "county", "cnty", cf);
   if (mode === "area" && A) [[0, 0], [1, 1]].forEach(([i, j]) => drag([A[i][0], A[j][1]], "vtx", p => { A[i][0] = p[0]; A[j][1] = p[1]; touch("settings"); refresh(); }, "Drag to resize"));
-  if (curTab === "set" && S.center) drag(S.center, "pin start", p => { S.center = p; touch("settings"); drawSet(); }, "Starting point (drag to move)");
+  if (curTab === "set" && S.center) drag(S.center, "pin start", p => { S.center = p; touch("settings"); drawSet(); }, "Starting Point (Drag to Move)");
   if (selG && ll(selG)) drag(ll(selG), "pin gr", p => { selG.LAT = p[1]; selG.LONG = p[0]; touch("ints"); refresh(); }, "Drag to move this grave");
 
   drawCem(); drawGrv();
@@ -302,13 +302,13 @@ function flags(box, row) {
 }
 
 // ---------- hazards ----------
-const HAZ = ["Uneven or sunken ground", "Steep slope", "Poison ivy or heavy brush", "Livestock", "Ticks or snakes", "Fallen or broken stones", "Open or damaged vault", "Flooding or mud"];
+const HAZ = ["Unstable / Uneven Ground", "Steep Slope(s)", "Heavy Brush / Roots", "Livestock / Animals", "Poison Ivy / Oak", "Fallen / Broken Stones", "Open / Damaged Vault", "Frequent Flooding / Mud"];
 function hazardBox(box, r) {
   const parts = (r.HAZARD_DETAILS || "").split(";").map(x => x.trim()).filter(Boolean);
   const b = el("div", { className:"box" }, [el("b", { textContent:"Hazards" })]);
   const any = el("input", { type:"checkbox", checked:r.HAZARDS === "1" });
   const boxes = HAZ.map(h => el("input", { type:"checkbox", checked:parts.includes(h) }));
-  const other = el("input", { value:parts.filter(x => !HAZ.includes(x)).join("; "), placeholder:"Other hazard (optional)" });
+  const other = el("input", { value:parts.filter(x => !HAZ.includes(x)).join("; "), placeholder:"Other Hazards (Optional)" });
   const save = () => {
     const list = HAZ.filter((h, i) => boxes[i].checked).concat(other.value.trim() ? [other.value.trim()] : []);
     if (list.length) any.checked = true;
@@ -316,7 +316,7 @@ function hazardBox(box, r) {
     ["HAZARDS", "HAZARD_DETAILS"].forEach(f => { if (!cemF.includes(f)) cemF.push(f); });
     touch("cem");
   };
-  b.append(el("label", {}, [any, " Hazards have been noted here"]));
+  b.append(el("label", {}, [any, " The Following Hazards Have Been Noted:"]));
   HAZ.forEach((h, i) => b.append(el("label", {}, [boxes[i], " " + h])));
   b.append(other);
   [any, other].concat(boxes).forEach(x => x.onchange = save);
@@ -374,10 +374,10 @@ function photoBox(box, path, label) {
   show();
   const f = el("input", { type:"file", accept:"image/*", hidden:true, onchange:async e => {
     const file = e.target.files[0]; if (!file) return;
-    try { photos.set(path, await shrink(file)); touch("photos"); k = 0; show(); say("Photo ready. It goes up with Publish (or Save)."); }
-    catch (err) { say("Couldn't read that picture: " + err.message); } } });
-  b.append(img, f, el("button", { textContent:"Choose photo…", onclick:() => f.click() }),
-    el("div", {}, [el("small", { textContent:"Saved as " + path + ". A new photo replaces the old one." })]));
+    try { photos.set(path, await shrink(file)); touch("photos"); k = 0; show(); say("Photo Ready. It goes up with Publish or Save."); }
+    catch (err) { say("Couldn't Read That Picture: " + err.message); } } });
+  b.append(img, f, el("button", { textContent:"Choose Photo…", onclick:() => f.click() }),
+    el("div", {}, [el("small", { textContent:"Saved as " + path + ". New Photos Replace Old Ones." })]));
   box.append(b);
 }
 
@@ -392,14 +392,14 @@ function listCem() {
     box.append(el("div", { className:r.ID === sel ? "on" : "", textContent:(r.NAME || "(no name)") + (ll(r) ? "" : "  – no location"), onclick:() => { pick(r.ID); tab("cem"); } })));
 }
 $("#csearch").oninput = listCem;
-$("#cadd").onclick = () => setMode("addCem", "Click the map where the new cemetery is.");
+$("#cadd").onclick = () => setMode("addCem", "Click anywhere on the map to place the new cemetery.");
 
 function drawCem() {
   listCem();
   const box = $("#cdet"); box.textContent = "";
-  const r = cem(); if (!r) { box.append(el("small", { textContent:"Pick a cemetery above, or click one on the map." })); return; }
+  const r = cem(); if (!r) { box.append(el("small", { textContent:"Pick a cemetery above or click one on the map." })); return; }
   box.append(el("h3", { textContent:"Edit: " + r.NAME }));
-  if (!ll(r)) box.append(el("button", { className:"go", textContent:"Place it on the map", onclick:() => setMode("putCem", "Click the map to place this cemetery.") }));
+  if (!ll(r)) box.append(el("button", { className:"go", textContent:"Place it on the map", onclick:() => setMode("putCem", "Click anywhere on the map to place this cemetery.") }));
   else box.append(el("small", { textContent:"Drag the yellow pin on the map to move it." }));
   coordBox(box, r, "cem");
   form(box, r, CEMF, "cem", cemF);
@@ -415,10 +415,10 @@ function drawCem() {
       if (!ringOf(f)) { const c = ll(r) || fix([map.getCenter().lng, map.getCenter().lat]), d = 0.0003, h = holder(sel, true);
         h.geometry = { type:"Polygon", coordinates:[[[c[0]-d,c[1]-d],[c[0]+d,c[1]-d],[c[0]+d,c[1]+d],[c[0]-d,c[1]+d],[c[0]-d,c[1]-d]]] }; touch("bounds"); }
       setMode("bound", "Drag white squares to reshape. Click the map to add a corner. Double-click a square to delete it."); } }),
-    ringOf(f) ? el("button", { className:"bad", textContent:"Remove", onclick:() => { if (confirm("Remove this cemetery's boundary?")) { f.geometry = null; touch("bounds"); refresh(); } } }) : ""]));
+    ringOf(f) ? el("button", { className:"bad", textContent:"Remove", onclick:() => { if (confirm("Remove This Cemetery's Boundary?")) { f.geometry = null; touch("bounds"); refresh(); } } }) : ""]));
   if (ringOf(f)) {
     const m = measure(ringOf(f));
-    b.append(el("div", {}, [el("small", { textContent:"Measures about " + (m.text.includes("'") ? m.text + " (" + m.acres.toFixed(2) + " acres)" : m.text + " acres") })]),
+    b.append(el("div", {}, [el("small", { textContent:"Measures About " + (m.text.includes("'") ? m.text + " (" + m.acres.toFixed(2) + " acres)" : m.text + " acres") })]),
       el("button", { textContent:"Set Size from boundary", onclick:() => { r.SIZE = measure(ringOf(holder(sel))).text; if (!cemF.includes("SIZE")) cemF.push("SIZE"); touch("cem"); drawCem(); } }));
   }
   box.append(b);
@@ -430,11 +430,11 @@ function drawCem() {
     el("select", { onchange:ev => { e.size = ev.target.value; touch("bounds"); refresh(); } },
       [["primary","Main"],["secondary","Side"]].map(o => el("option", { value:o[0], textContent:o[1], selected:(e.size || "primary") === o[0] }))),
     el("button", { className:"bad", textContent:"✕", title:"Delete entrance", onclick:() => { list.splice(i, 1); touch("bounds"); refresh(); } })])));
-  en.append(el("button", { textContent:"+ Add entrance", onclick:() => setMode("addEnt", "Click the map where the entrance is.") }));
-  en.append(el("div", {}, [el("small", { textContent:"Main = big green dot, Side = small light dot. Drag them to move." })]));
+  en.append(el("button", { textContent:"+ Add entrance", onclick:() => setMode("addEnt", "Click on the map where you want to place this entrance.") }));
+  en.append(el("div", {}, [el("small", { textContent:"Main Entrance == Large Green Dot, Side Estrances = Small Light Dot. Drag them to move them around." })]));
   box.append(en);
 
-  box.append(el("button", { className:"bad", textContent:"Delete this cemetery", onclick:() => {
+  box.append(el("button", { className:"bad", textContent:"Delete This Cemetery", onclick:() => {
     const n = ints.filter(x => x.CEMETERY_ID === sel).length;
     if (!confirm("Delete " + r.NAME + (n ? " and its " + n + " graves" : "") + "? This can't be undone after you save.")) return;
     cems = cems.filter(x => x !== r); ints = ints.filter(x => x.CEMETERY_ID !== sel);
@@ -448,7 +448,7 @@ function drawGrv() {
   const r = cem(); if (!r) { box.append(el("small", { textContent:"Pick a cemetery on the Cemeteries tab first." })); return; }
   const rows = ints.filter(x => x.CEMETERY_ID === sel);
   box.append(el("h3", { textContent:r.NAME + " – " + rows.length + " graves" }));
-  box.append(el("small", { textContent:"On the map: gold ring = veteran, purple ring = pioneer, bigger dot = above ground." }));
+  box.append(el("small", { textContent:"Map: Gold Ring == Veteran, Purple Ring == Pioneer, Large Dot == Above Ground." }));
   const list = el("div", { className:"list" });
   rows.slice(0, 400).forEach(x => list.append(el("div", { className:x === selG ? "on" : "",
     textContent:((x["LAST NAME"] || "?") + ", " + (x["FIRST NAME"] || "")) + (x.VETERAN === "1" ? " ★" : "") + (ll(x) ? "" : "  – no location"),
@@ -456,12 +456,12 @@ function drawGrv() {
   box.append(list, el("button", { className:"go", textContent:"+ Add grave", onclick:() => setMode("newGrave", "Click the map where the grave is.") }));
   if (selG && selG.CEMETERY_ID === sel) {
     box.append(el("h3", { textContent:"Edit grave" }));
-    if (ll(selG)) box.append(el("small", { textContent:"Drag the blue pin on the map to move it." }));
+    if (ll(selG)) box.append(el("small", { textContent:"Drag the Blue Pin on the map to move it." }));
     else box.append(el("button", { textContent:"Place on map", onclick:() => setMode("putGrave", "Click the map to place this grave.") }));
     coordBox(box, selG, "ints"); form(box, selG, GRF, "ints", intF); flags(box, selG);
     if (selG.MARKER_ID) photoBox(box, "photos/gravepics/" + selG.MARKER_ID + "-1.jpg", "Grave photo");
-    else box.append(el("small", { textContent:"This grave has no marker ID, so it can't have a photo yet." }));
-    box.append(el("p", {}, [el("button", { className:"bad", textContent:"Delete this grave", onclick:() => {
+    else box.append(el("small", { textContent:"This grave has no Marker ID, so it can't have a photo yet." }));
+    box.append(el("p", {}, [el("button", { className:"bad", textContent:"Delete This Grave", onclick:() => {
       if (!confirm("Delete this grave record?")) return; ints = ints.filter(x => x !== selG); selG = null; touch("ints"); refresh(); } })]));
   }
 }
@@ -487,10 +487,10 @@ COL.forEach(([k, label]) => $("#cols").append(el("div", { className:"row" }, [
 function drawSet() {
   $("#sname").value = S.name; $("#sshort").value = S.shortName; $("#spre").value = S.idPrefix;
   COL.forEach(([k]) => $("#col-" + k).value = S.colors[k] || COLOR_DEF[k]);
-  $("#viewtxt").textContent = S.center ? "Saved view: " + S.center[1].toFixed(4) + ", " + S.center[0].toFixed(4) + " at zoom " + S.zoom.toFixed(1) : "No starting view saved yet.";
+  $("#viewtxt").textContent = S.center ? "Saved view: " + S.center[1].toFixed(4) + ", " + S.center[0].toFixed(4) + " at zoom " + S.zoom.toFixed(1) : "No Starting View saved yet.";
 }
 $("#setview").onclick = () => { const c = map.getCenter(); S.center = fix([c.lng, c.lat]); S.zoom = +map.getZoom().toFixed(2); touch("settings"); drawSet(); };
-$("#cedit").onclick = () => { if (!ringOf(county)) return say("Load a county outline file first."); setMode("county", "Drag white squares to reshape. Click the map to add a point. Double-click a square to delete it."); };
+$("#cedit").onclick = () => { if (!ringOf(county)) return say("Load a county outline file first."); setMode("county", "Drag the White Squares to reshape. Click the map to add a point. Double-click a White Square to delete it."); };
 $("#cload").onclick = () => $("#cfile").click();
 $("#cfile").onchange = async e => {
   try { newOutline(pickCounty(JSON.parse((await e.target.files[0].text()).replace(/^\uFEFF/, "")))); }
