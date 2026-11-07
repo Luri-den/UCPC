@@ -333,8 +333,13 @@
     btn.onclick = async () => {
       if (!getToken() || !settings().owner || !settings().repo) { settingsDialog(() => btn.click()); return; }
       btn.disabled = true;
-      try { reviewDialog(ids.length ? await capture(ids) : [], opts); }
-      finally { btn.disabled = false; }
+      try {
+        if (opts.prepare) {   // e.g. merge other people's changes first
+          try { await opts.prepare(); }
+          catch (e) { alert("Couldn't check GitHub for newer changes, so nothing was published.\n\n" + e.message); return; }
+        }
+        reviewDialog(ids.length ? await capture(ids) : [], opts);
+      } finally { btn.disabled = false; }
     };
   }
 
@@ -344,5 +349,15 @@
     return (await api("/git/trees/" + base + "?recursive=1")).tree.filter(x => x.type === "blob").map(x => x.path);
   }
 
-  window.GHPublish = { attach, publish, settingsDialog, listFiles, settings };
+  async function rebase() { baseSha = (await api("/git/ref/heads/" + await branchName())).object.sha; return baseSha; }
+  async function readText(path, ref) {   // latest text of one repo file, or null if it doesn't exist
+    const s = settings(), res = await fetch("https://api.github.com/repos/" + s.owner + "/" + s.repo + "/contents/" +
+      path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(ref || await branchName()),
+      { cache: "no-store", headers: { Accept: "application/vnd.github.raw+json", Authorization: "Bearer " + getToken() } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("GitHub answered " + res.status);
+    return res.text();
+  }
+
+  window.GHPublish = { attach, publish, settingsDialog, listFiles, settings, rebase, read: readText };
 })();

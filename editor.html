@@ -124,11 +124,12 @@ const FILES_DEF = { cemeteries:"cemlist.csv", interments:"interments.csv", bound
 // ---------- state ----------
 let S, cems, cemF, ints, intF, bounds, county, dir, sel, selG, mode, ready, tmp = [];
 const dirty = new Set();
+let hadSettings = false;   // true when a settings.json was found on open
 const photos = new Map();   // pending photos: path in the repository -> image Blob
 function blank() {
   S = { name:"", shortName:"", idPrefix:"FC", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
   cems = []; cemF = CEM_DEF.slice(); ints = []; intF = INT_DEF.slice();
-  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear();
+  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear(); hadSettings = false;
 }
 blank();
 const cem = () => cems.find(r => r.ID === sel);
@@ -605,7 +606,7 @@ async function load(files) {
       else if (F.includes("ID") && F.includes("NAME")) { cems = p.data; cemF = F; S.files.cemeteries = n; got.push(n); }
     } else {
       let j; try { j = JSON.parse(text); } catch (e) { continue; }
-      if (j.colors || j.files) { S = Object.assign(S, j); S.colors = Object.assign({}, COLOR_DEF, j.colors); S.files = Object.assign({}, FILES_DEF, j.files); got.push(n); }
+      if (j.colors || j.files) { S = Object.assign(S, j); S.colors = Object.assign({}, COLOR_DEF, j.colors); S.files = Object.assign({}, FILES_DEF, j.files); hadSettings = true; got.push(n); }
       else if (j.type === "FeatureCollection" && (!j.features.length || j.features.some(x => x.properties && x.properties.CEMETERY_ID))) { bounds = j; S.files.boundaries = n; got.push(n); }
       else if (j.type === "Feature" || j.type === "FeatureCollection") { try { county = pickCounty(j); S.files.county = n; got.push(n); } catch (e) { } }
     }
@@ -614,6 +615,7 @@ async function load(files) {
   if (S.center) map.jumpTo({ center:S.center, zoom:S.zoom }); else fitCounty();
   $("#save").disabled = true; $("#save").className = "";
   tab("set"); drawSet(); refresh();
+  takeSnap();
   say("Opened " + cems.length + " cemeteries and " + ints.length + " graves.");
 }
 $("#open").onclick = async () => {
@@ -631,11 +633,96 @@ $("#new").onclick = () => {
   say("New map started. Next, on the Map tab, search for your county or town outline.");
 };
 
+// ---------- merge with GitHub before publishing ----------
+// Other people may have published since you opened the editor. Before publishing, each changed file is compared
+// record by record: what you didn't touch is taken from GitHub, what they didn't touch is kept from you.
+let snap = { cem:new Map(), ints:new Map(), bnd:new Map() };   // what the files looked like when you opened them
+const kCem = r => r.ID;
+const kInt = r => r.CEMETERY_ID + "|" + (r.PERSON_ID || r.MARKER_ID || JSON.stringify(r));
+const kBnd = f => { const p = f.properties || {}; return p.CEMETERY_ID && !(p.TYPE && p.TYPE !== "BOUNDARY") ? p.CEMETERY_ID : JSON.stringify(f); };
+const toMap = (arr, k) => { const m = new Map(); arr.forEach(x => m.set(k(x), x)); return m; };
+function takeSnap() {
+  const c = x => JSON.parse(JSON.stringify(x));
+  snap = { cem:toMap(cems.map(c), kCem), ints:toMap(ints.map(c), kInt), bnd:toMap(bounds.features.map(c), kBnd) };
+}
+function merge3(B, M, T, sig, label) {
+  const out = [], clash = [];
+  new Set([...B.keys(), ...M.keys(), ...T.keys()]).forEach(k => {
+    const b = B.get(k), m = M.get(k), t = T.get(k), sb = b && sig(b), sm = m && sig(m), st = t && sig(t);
+    let pick;
+    if (sm === sb) pick = t;                                   // you didn't touch it: take theirs (or their delete)
+    else if (st === sb || sm === st) pick = m;                 // they didn't touch it, or we agree: keep yours
+    else if (!b) { pick = t; clash.push(m); }                  // both of you made a NEW record with the same ID
+    else pick = confirm(label(m || t) + "\n\nYou and someone else both changed this.\n\nOK = keep YOUR version\nCancel = keep THEIR version") ? m : t;
+    if (pick) out.push(pick);
+  });
+  return { out, clash };
+}
+function renumberCem(m) {
+  const old = m.ID, n = Math.max(0, ...cems.map(r => parseInt(String(r.ID).replace(/\D/g, ""), 10) || 0)) + 1;
+  m.ID = S.idPrefix + String(n).padStart(3, "0");
+  ints.forEach(r => { if (r.CEMETERY_ID === old) r.CEMETERY_ID = m.ID; });
+  bounds.features.forEach(f => { if ((f.properties || {}).CEMETERY_ID === old) f.properties.CEMETERY_ID = m.ID; });
+  [...photos.keys()].forEach(k => {
+    const x = k.replace("photos/" + old + ".", "photos/" + m.ID + ".").replace("photos/" + old + "-", "photos/" + m.ID + "-");
+    if (x !== k) { photos.set(x, photos.get(k)); photos.delete(k); }
+  });
+  if (sel === old) sel = m.ID;
+  cems.push(m); dirty.add("cem"); dirty.add("ints"); dirty.add("bounds");
+}
+function renumberStone(cid, old, movers) {
+  const digits = (cid.replace(/\D/g, "") || "0").slice(-3).padStart(3, "0"); let n = 1, id;
+  do { id = "M-" + digits + "-" + String(n++).padStart(3, "0"); } while (ints.some(x => x.MARKER_ID === id));
+  movers.forEach(r => {
+    r.PERSON_ID = String(r.PERSON_ID || "").startsWith(old) ? id + r.PERSON_ID.slice(old.length) : id;
+    r.MARKER_ID = id; if (!ints.includes(r)) ints.push(r);
+  });
+  const k = "photos/gravepics/" + old + "-1.jpg";
+  if (photos.has(k)) { photos.set("photos/gravepics/" + id + "-1.jpg", photos.get(k)); photos.delete(k); }
+}
+async function syncFromGitHub() {
+  const head = await GHPublish.rebase();
+  const get = async name => { const t = await GHPublish.read(name, head); return t == null ? null : t.replace(/^\uFEFF/, ""); };
+  const parse = t => Papa.parse(t, { header:true, skipEmptyLines:true, transformHeader:h => h.trim() });
+  const sigOf = F => r => JSON.stringify(F.map(f => String(r[f] == null ? "" : r[f]).trim()));
+  if (dirty.has("cem")) {
+    const t = await get(S.files.cemeteries);
+    if (t) {
+      const p = parse(t), F = [...new Set([...cemF, ...p.meta.fields])];
+      const { out, clash } = merge3(snap.cem, toMap(cems, kCem), toMap(p.data, kCem), sigOf(F), r => r.NAME || r.ID);
+      cems = out; cemF = F; clash.forEach(renumberCem);
+    }
+  }
+  if (dirty.has("ints")) {
+    const t = await get(S.files.interments);
+    if (t) {
+      const p = parse(t), F = [...new Set([...intF, ...p.meta.fields])], mine = ints.slice();
+      const { out, clash } = merge3(snap.ints, toMap(mine, kInt), toMap(p.data, kInt), sigOf(F), r => ((r["FIRST NAME"] || "") + " " + (r["LAST NAME"] || "")).trim() || r.PERSON_ID);
+      ints = out; intF = F; const done = new Set();
+      clash.forEach(c => {
+        const g = c.CEMETERY_ID + "|" + c.MARKER_ID; if (done.has(g)) return; done.add(g);
+        renumberStone(c.CEMETERY_ID, c.MARKER_ID, mine.filter(r => r.CEMETERY_ID === c.CEMETERY_ID && r.MARKER_ID === c.MARKER_ID));
+      });
+    }
+  }
+  if (dirty.has("bounds")) {
+    const t = await get(S.files.boundaries);
+    if (t) {
+      const j = JSON.parse(t), sig = f => JSON.stringify([f.geometry, f.properties]);
+      bounds.features = merge3(snap.bnd, toMap(bounds.features, kBnd), toMap(j.features || [], kBnd), sig, f => (f.properties || {}).NAME || (f.properties || {}).CEMETERY_ID).out;
+    }
+  }
+  if (sel && !cems.some(r => r.ID === sel)) sel = null;
+  if (selG && !ints.includes(selG)) selG = null;
+  refresh(); say("Checked GitHub and merged other people's changes with yours.");
+}
+
 // ---------- saving ----------
 function outFiles() {
   if (!S.center) { const c = map.getCenter(); S.center = fix([c.lng, c.lat]); S.zoom = +map.getZoom().toFixed(2); }
   if (!S.maxBounds && county) areaFromCounty();
-  const o = [["settings.json", JSON.stringify(S, null, 2)]];
+  const o = [];
+  if (dirty.has("settings") || !hadSettings) o.push(["settings.json", JSON.stringify(S, null, 2)]);   // not re-sent unless you changed it, so you never overwrite someone else's settings
   if (dirty.has("cem")) o.push([S.files.cemeteries, Papa.unparse(cems, { columns:cemF })]);
   if (dirty.has("ints")) o.push([S.files.interments, Papa.unparse(ints, { columns:intF })]);
   if (dirty.has("bounds")) o.push([S.files.boundaries, JSON.stringify(bounds, null, 1)]);
@@ -673,6 +760,6 @@ async function loadFromSite() {
 loadFromSite();
 </script>
 <script src="publish.js"></script>
-<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, onPublished:() => { clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
+<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 </body>
 </html>
