@@ -111,6 +111,7 @@ const CEMF = [["NAME","Name"],["OTHER_NAMES","Other names"],["TOWNSHIP","Townshi
   ["SIZE","Size"],["PUBLIC_NOTES","Notes shown to visitors","area"],["LOCATION_DETAILS","How to find it","area"]];
 const GRF = [["FIRST NAME","First name"],["LAST NAME","Last name"],["BIRTH","Born"],["DEATH","Died"],
   ["SEX","Sex","sel",[["","Unknown"],["F","Female"],["M","Male"]]],["WAR","War"],["VET DETAILS","Veteran details"],
+  ["STONE_TYPE","Stone Type","sel",[["","Not Recorded"],["Flush With Ground","Flush With Ground"],["Flat Tablet / Slab","Flat Tablet / Slab"],["Obelisk / Column / Monument","Obelisk / Column / Monument"],["Standing (Vertical) Block / Arch / Slab","Standing (Vertical) Block / Arch / Slab"],["Military Marker (Official)","Military Marker (Official)"],["Boulder / Rock","Boulder / Rock"],["Above Ground (Single Interment)","Above Ground (Single Interment)"],["Above Ground Structure (Mausoleum, etc.)","Above Ground Structure (Mausoleum, etc.)"]]],
   ["ROW","Row"],["PLOT","Plot"],["ADDITIONAL INFORMATION ON STONE","Writing on the stone","area"]];
 const FLAGS = [["VETERAN","Veteran"],["PIONEER","Pioneer"],["MAUS","Above ground (mausoleum, vault)"]];
 const COL = [["accent","Page Header"],["public","Public Cemeteries"],["permission","Ask Permission"],["private","Private Land"],
@@ -181,7 +182,7 @@ map.on("click", e => {
     list.push({ label:"Entrance", size:list.length ? "secondary" : "primary", coords:p });
     touch("bounds"); setMode(null); refresh(); return;
   }
-  if (mode === "putGrave") { selG.LAT = p[1]; selG.LONG = p[0]; touch("ints"); setMode(null); refresh(); return; }
+  if (mode === "putGrave") { moveStone(selG, p[1], p[0]); touch("ints"); setMode(null); refresh(); return; }
   if (mode === "bound") { addVertex(ringOf(holder(sel)), p); touch("bounds"); refresh(); return; }
   if (mode === "county") { addVertex(ringOf(county), p); touch("county"); refresh(); return; }
   const hit = map.queryRenderedFeatures(e.point, { layers:["gr", "cems"] })[0];
@@ -268,7 +269,13 @@ function refresh() {
   const A = S.maxBounds;
   src("area", A ? fc([{ type:"Feature", properties:{}, geometry:{ type:"Polygon", coordinates:[[[A[0][0],A[0][1]],[A[1][0],A[0][1]],[A[1][0],A[1][1]],[A[0][0],A[1][1]],[A[0][0],A[0][1]]]] } }]) : EMPTY);
   const g = [];
-  if (sel) ints.forEach((r, i) => { const c = ll(r); if (r.CEMETERY_ID === sel && c) g.push({ type:"Feature", properties:{ i, v:r.VETERAN === "1" ? 1 : 0, p:r.PIONEER === "1" ? 1 : 0, m:r.MAUS === "1" ? 1 : 0 }, geometry:{ type:"Point", coordinates:c } }); });
+  const seen = new Map();
+  if (sel) ints.forEach((r, i) => {
+    const c = ll(r); if (r.CEMETERY_ID !== sel || !c) return;
+    const k = (r.MARKER_ID || "#" + i) + "|" + c; let f = seen.get(k);
+    if (!f) { f = { type:"Feature", properties:{ i, v:0, p:0, m:0 }, geometry:{ type:"Point", coordinates:c } }; seen.set(k, f); g.push(f); }
+    if (r.VETERAN === "1") f.properties.v = 1; if (r.PIONEER === "1") f.properties.p = 1; if (r.MAUS === "1") f.properties.m = 1;
+  });
   src("gr", fc(g));
 
   tmp.forEach(m => m.remove()); tmp = [];
@@ -280,7 +287,7 @@ function refresh() {
   if (mode === "county" && ringOf(county)) vertexMarkers(ringOf(county), "county", "cnty", cf);
   if (mode === "area" && A) [[0, 0], [1, 1]].forEach(([i, j]) => drag([A[i][0], A[j][1]], "vtx", p => { A[i][0] = p[0]; A[j][1] = p[1]; touch("settings"); refresh(); }, "Drag to resize"));
   if (curTab === "set" && S.center) drag(S.center, "pin start", p => { S.center = p; touch("settings"); drawSet(); }, "Starting Point (Drag to Move)");
-  if (selG && ll(selG)) drag(ll(selG), "pin gr", p => { selG.LAT = p[1]; selG.LONG = p[0]; touch("ints"); refresh(); }, "Drag to move this grave");
+  if (selG && ll(selG)) drag(ll(selG), "pin gr", p => { moveStone(selG, p[1], p[0]); touch("ints"); refresh(); }, "Drag to move this grave");
 
   drawCem(); drawGrv();
 }
@@ -291,7 +298,15 @@ function form(box, row, desc, key, F) {
     const i = type === "sel" ? el("select", {}, opts.map(o => el("option", { value:o[0], textContent:o[1] })))
       : el(type === "area" ? "textarea" : "input", {});
     i.value = row[f] || "";
-    i.onchange = () => { row[f] = i.value; if (!F.includes(f)) F.push(f); touch(key); listCem(); };
+    i.onchange = () => {
+      row[f] = i.value; if (!F.includes(f)) F.push(f);
+      if (key === "ints" && f === "STONE_TYPE") {   // the stone type belongs to the stone, so everyone on it gets it
+        sameStone(row).forEach(x => x.STONE_TYPE = i.value);
+        if (/^Above Ground/.test(i.value)) { sameStone(row).forEach(x => x.MAUS = "1"); if (!intF.includes("MAUS")) intF.push("MAUS"); }
+        touch(key); refresh(); return;
+      }
+      touch(key); listCem();
+    };
     box.append(el("label", { textContent:label }), i);
   });
 }
@@ -345,6 +360,19 @@ function autoSize() {   // fills Size when leaving boundary editing, but only if
   r.SIZE = measure(ring).text; if (!cemF.includes("SIZE")) cemF.push("SIZE"); touch("cem");
 }
 
+// ---------- shared stones (several people, one marker) ----------
+const sameStone = r => r.MARKER_ID ? ints.filter(x => x.CEMETERY_ID === r.CEMETERY_ID && x.MARKER_ID === r.MARKER_ID) : [r];
+function moveStone(r, lat, lon) { sameStone(r).forEach(x => { x.LAT = lat; x.LONG = lon; }); }
+function addPerson(r) {
+  const grp = sameStone(r), row = {}, letter = n => n < 26 ? String.fromCharCode(65 + n) : String(n);
+  intF.forEach(f => row[f] = "");
+  grp.forEach(x => { if (x.PERSON_ID === x.MARKER_ID) x.PERSON_ID = x.MARKER_ID + "A"; });   // first person becomes ...A, like your other stones
+  let n = grp.length, id;
+  do { id = r.MARKER_ID + letter(n++); } while (ints.some(x => x.PERSON_ID === id));
+  Object.assign(row, { CEMETERY_ID:r.CEMETERY_ID, MARKER_ID:r.MARKER_ID, PERSON_ID:id, "LAST NAME":r["LAST NAME"] || "", VETERAN:"0", PIONEER:"0", MAUS:r.MAUS || "0", STONE_TYPE:r.STONE_TYPE || "", ROW:r.ROW || "", PLOT:r.PLOT || "", LAT:r.LAT, LONG:r.LONG });
+  ints.push(row); selG = row; touch("ints"); refresh();
+}
+
 // ---------- location field ----------
 function coordBox(box, row, key) {
   const c = ll(row), i = el("input", { value:c ? c[1] + ", " + c[0] : "", placeholder:"39.12345, -85.12345" });
@@ -353,10 +381,31 @@ function coordBox(box, row, key) {
     if (n.length !== 2) return say("Type the location as latitude, longitude, for example 39.12345, -85.12345.");
     let [a, o] = n; if (Math.abs(a) > 90) [a, o] = [o, a];
     if (Math.abs(a) > 90 || Math.abs(o) > 180) return say("Those numbers don't look like a location.");
-    row.LAT = +a.toFixed(7); row.LONG = +o.toFixed(7); touch(key); refresh();
+    row.LAT = +a.toFixed(7); row.LONG = +o.toFixed(7); if (key === "ints") moveStone(row, row.LAT, row.LONG); touch(key); refresh();
     map.flyTo({ center:[row.LONG, row.LAT], zoom:Math.max(map.getZoom(), 17) });
   };
   box.append(el("label", { textContent:"Location (latitude, longitude)" }), i, el("small", { textContent:"Paste straight from Google Maps, or drag the pin on the map." }));
+}
+
+// ---------- fence ----------
+const FENCES = ["Stone", "Wire", "Cast Iron", "Aluminum / Vinyl", "Pipe", "Chain Link"];
+function fenceBox(box, r) {
+  const parts = (r.FENCE_TYPES || "").split(";").map(x => x.trim()).filter(Boolean);
+  const b = el("div", { className:"box" }, [el("b", { textContent:"Fence" })]);
+  const yn = el("select", {}, [["", "Not Recorded"], ["1", "Yes, This Cemetery Has a Fence"], ["0", "No Fence"]].map(o => el("option", { value:o[0], textContent:o[1] })));
+  yn.value = r.FENCE || "";
+  const boxes = FENCES.map(t => el("input", { type:"checkbox", checked:parts.includes(t) }));
+  const rows = FENCES.map((t, i) => el("label", {}, [boxes[i], " " + t]));
+  const gray = () => { boxes.forEach(c => c.disabled = yn.value !== "1"); rows.forEach(l => l.style.opacity = yn.value === "1" ? 1 : 0.4); };
+  const save = () => {
+    r.FENCE = yn.value; r.FENCE_TYPES = yn.value === "1" ? FENCES.filter((t, i) => boxes[i].checked).join("; ") : "";
+    ["FENCE", "FENCE_TYPES"].forEach(f => { if (!cemF.includes(f)) cemF.push(f); });
+    gray(); touch("cem");
+  };
+  yn.onchange = save; boxes.forEach(c => c.onchange = save); gray();
+  b.append(el("label", { textContent:"Does this cemetery have a fence?" }), yn, el("label", { textContent:"What kind? (check all that apply)" }));
+  rows.forEach(l => b.append(l));
+  box.append(b);
 }
 
 // ---------- photos ----------
@@ -404,6 +453,7 @@ function drawCem() {
   coordBox(box, r, "cem");
   form(box, r, CEMF, "cem", cemF);
   hazardBox(box, r);
+  fenceBox(box, r);
   [["", "Entrance photo (shown first)"], ["-2", "Photo 2"], ["-3", "Photo 3"]].forEach(([sfx, label], i) => {
     photoBox(box, "photos/" + r.ID + sfx + ".jpg", label);
     form(box.lastChild, r, [["PHOTO" + (i + 1) + "_CAPTION", "Caption (optional)"]], "cem", cemF);
@@ -431,7 +481,7 @@ function drawCem() {
       [["primary","Main"],["secondary","Side"]].map(o => el("option", { value:o[0], textContent:o[1], selected:(e.size || "primary") === o[0] }))),
     el("button", { className:"bad", textContent:"✕", title:"Delete entrance", onclick:() => { list.splice(i, 1); touch("bounds"); refresh(); } })])));
   en.append(el("button", { textContent:"+ Add entrance", onclick:() => setMode("addEnt", "Click on the map where you want to place this entrance.") }));
-  en.append(el("div", {}, [el("small", { textContent:"Main Entrance == Large Green Dot, Side Estrances = Small Light Dot. Drag them to move them around." })]));
+  en.append(el("div", {}, [el("small", { textContent:"Main Entrance == Large Green Dot, Side Entrances = Small Light Dot. Drag them to move them around." })]));
   box.append(en);
 
   box.append(el("button", { className:"bad", textContent:"Delete This Cemetery", onclick:() => {
@@ -447,18 +497,22 @@ function drawGrv() {
   const box = $("#gdet"); box.textContent = "";
   const r = cem(); if (!r) { box.append(el("small", { textContent:"Pick a cemetery on the Cemeteries tab first." })); return; }
   const rows = ints.filter(x => x.CEMETERY_ID === sel);
-  box.append(el("h3", { textContent:r.NAME + " – " + rows.length + " graves" }));
+  box.append(el("h3", { textContent:r.NAME + " – " + rows.length + " people" }));
   box.append(el("small", { textContent:"Map: Gold Ring == Veteran, Purple Ring == Pioneer, Large Dot == Above Ground." }));
   const list = el("div", { className:"list" });
-  rows.slice(0, 400).forEach(x => list.append(el("div", { className:x === selG ? "on" : "",
-    textContent:((x["LAST NAME"] || "?") + ", " + (x["FIRST NAME"] || "")) + (x.VETERAN === "1" ? " ★" : "") + (ll(x) ? "" : "  – no location"),
-    onclick:() => { selG = x; refresh(); if (ll(x)) map.flyTo({ center:ll(x), zoom:Math.max(map.getZoom(), 19) }); else setMode("putGrave", "Click the map to place this grave."); } })));
+  const groups = new Map(); rows.forEach(x => { const k = x.MARKER_ID || x; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+  let shown = 0;
+  groups.forEach(g => g.forEach((x, i) => { if (shown++ > 400) return; list.append(el("div", { className:x === selG ? "on" : "",
+    textContent:(i ? "   ↳ " : "") + ((x["LAST NAME"] || "?") + ", " + (x["FIRST NAME"] || "")) + (x.VETERAN === "1" ? " ★" : "") + (!i && g.length > 1 ? "  (" + g.length + " people, one stone)" : "") + (ll(x) ? "" : "  – no location"),
+    onclick:() => { selG = x; refresh(); if (ll(x)) map.flyTo({ center:ll(x), zoom:Math.max(map.getZoom(), 19) }); else setMode("putGrave", "Click the map to place this grave."); } })); }));
   box.append(list, el("button", { className:"go", textContent:"+ Add grave", onclick:() => setMode("newGrave", "Click the map where the grave is.") }));
   if (selG && selG.CEMETERY_ID === sel) {
     box.append(el("h3", { textContent:"Edit grave" }));
     if (ll(selG)) box.append(el("small", { textContent:"Drag the Blue Pin on the map to move it." }));
     else box.append(el("button", { textContent:"Place on map", onclick:() => setMode("putGrave", "Click the map to place this grave.") }));
     coordBox(box, selG, "ints"); form(box, selG, GRF, "ints", intF); flags(box, selG);
+    if (selG.MARKER_ID) box.append(el("button", { className:"go", textContent:"+ Add Another Person to This Stone", onclick:() => addPerson(selG) }),
+      el("div", {}, [el("small", { textContent:"Stone " + selG.MARKER_ID + ": " + sameStone(selG).length + " person(s). Moving the pin moves everyone on it." })]));
     if (selG.MARKER_ID) photoBox(box, "photos/gravepics/" + selG.MARKER_ID + "-1.jpg", "Grave photo");
     else box.append(el("small", { textContent:"This grave has no Marker ID, so it can't have a photo yet." }));
     box.append(el("p", {}, [el("button", { className:"bad", textContent:"Delete This Grave", onclick:() => {

@@ -2836,6 +2836,7 @@ function updateCemeteryGraves() {
                 Row: person.row || "",
                 Plot: person.plot || "",
                 Stone_Info: person.stoneInfo || "",
+                Stone_Type: person.stoneType || "",
                 Vet_Details: person.vetDetails || "",
                 Marker_ID: person.markerID || "",
                 Mausoleum: person.mausoleum === true,
@@ -3127,6 +3128,7 @@ function handleGraveClick(event) {
             row: props.Row || "",
             plot: props.Plot || "",
             stoneInfo: props.Stone_Info || "",
+            stoneType: props.Stone_Type || "",
             vetDetails: props.Vet_Details || "",
             markerID: props.Marker_ID || ""
         };
@@ -3161,6 +3163,7 @@ function handleGraveClick(event) {
     if (person.vetDetails) { facts += fact("Details", person.vetDetails); }
     if (person.row) { facts += fact("Row", person.row); }
     if (person.plot) { facts += fact("Plot", person.plot); }
+    if (person.stoneType) { facts += fact("Stone Type", person.stoneType); }
     if (person.stoneInfo) { facts += fact("On Stone", person.stoneInfo); }
     if (person.markerID) { facts += fact("Marker ID", person.markerID); }
 
@@ -3247,6 +3250,7 @@ function showSharedMarkerPanel(cemeteryID, markerID, viewAll) {
             
             if (person.row) { html += popupField("Row", person.row); }
             if (person.plot) { html += popupField("Plot", person.plot); }
+            if (person.stoneType) { html += popupField("Stone Type", person.stoneType); }
             if (person.stoneInfo) { html += popupField("Additional Information on Stone", person.stoneInfo); }
 
             html += `</div>`;
@@ -3469,6 +3473,7 @@ function showCemeteryPanel(feature) {
         ${popupField("Accessibility", accessText)}
         ${popupField("Veterans", vetsText)}
         ${popupField("Pioneers", pioneersText)}
+        ${String(props.Fence) === "1" ? popupField("Fence", props.Fence_Types || "Yes") : ""}
 
         <h3>Condition Status</h3>
         <p>${escapeHtml(props.Condition_Notes || "No condition information on file.")}</p>
@@ -4146,6 +4151,7 @@ function loadInterments(path) {
                     row: cleanString(row.ROW),
                     plot: cleanString(row.PLOT),
                     stoneInfo: cleanString(row["ADDITIONAL INFORMATION ON STONE"]),
+                    stoneType: cleanString(row["STONE_TYPE"]),
                     veteran: cleanString(row.VETERAN) === "1",
                     war: cleanString(row.WAR), 
                     vetDetails: cleanString(row["VET DETAILS"]),
@@ -5197,6 +5203,8 @@ map.on("load", function () {
                         Grave_Estimate: row._EST === "" || row._EST === undefined ? -1 : (parseInt(row._EST, 10) || 0),
                         Hazards: row._HAZARDS === true,
                         Hazard_Details: row.HAZARD_DETAILS || "",
+                        Fence: row.FENCE || "",
+                        Fence_Types: row.FENCE_TYPES || "",
                         Hide_Location: parseInt(row.HIDE, 10) === 1,
                         Location_Details: row.LOCATION_DETAILS || "",
                         Search_Match: false,
