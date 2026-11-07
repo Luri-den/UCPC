@@ -1,24 +1,24 @@
-CEMETERY_ID,MARKER_ID,PERSON_ID,LAST NAME,FIRST NAME,BIRTH,DEATH,ROW,PLOT,ADDITIONAL INFORMATION ON STONE,VETERAN,WAR,VET DETAILS,MAUS,LAT,LONG,PIONEER,SEX
-FC0031,M-031-001,M-031-001,Briggs,Mary,,"February 10, 1905",,,Wife of William,0,0,,0,,,1,F
-FC0031,M-031-002,M-031-002,Briggs,William,,"March 12, 1905",,,,0,0,,0,,,1,M
-FC0031,M-031-003,M-031-003,Higgs,Martha,"December 25, 1784","August 16, 1849",,,,0,0,,0,,,1,F
-FC0031,M-031-004,M-031-004,Higgs,William,"February 9, 1778","April 4, 1852",,,,0,0,,0,,,1,M
-FC0031,M-031-005,M-031-005,Stewart,Elizabeth,"April 4, 1845","May 9, 1874",,,Wife of George W. Stewart,0,0,,0,,,1,F
-FC0031,M-031-006,M-031-006,Stewart,George,"October 16, 1850","November 18, 1879",,,Son of A & F Stewart,0,0,,0,,,1,M
-FC0031,M-031-007,M-031-007,Stewart,Martha J.,"July 27, 1864","September 12, 1864",,,Daughter of George and Elizabeth,0,0,,0,,,1,F
-FC0031,M-031-008,M-031-008,Stewart,Mathew,"March 21, 1814","January 27, 1856",,,,0,0,,0,,,1,M
-FC0031,M-031-009,M-031-009,Stewart,Infant,"August 2, 1872","August 23, 1872",,,Son of George and Elizabeth,0,0,,0,,,1,M
-FC0031,M-031-010,M-031-010,Warne,Elizabeth,"May 6, 1836","April 14, 1864",,,,0,0,,0,,,1,F
-FC0031,M-031-011,M-031-011,Warne,Elijah,"January 1, 1890","December 18, 1956",1,1,,1,American Civil War,"Company C, 58th Indiana Infantry",0,,,1,M
-FC0202,M-202-001,M-202-001,Test,Bill,"January 2, 1890","December 19, 1956",2,2,,0,0,,0,39.424239,-85.045349,0,M
-FC0202,M-202-002,M-202-002,Test,Will,"January 3, 1890","December 20, 1956",3,3,,0,0,,0,39.424239,-85.045342,0,M
-FC0202,M-202-003,M-202-003,Test,Phil,"January 4, 1890","December 21, 1956",4,4,,0,0,,0,39.424239,-85.045335,0,M
-FC0202,M-202-004,M-202-004A,Test,Gill,"January 5, 1890","December 22, 1956",5,5,,0,0,,1,39.424239,-85.045328,0,M
-FC0202,M-202-004,M-202-004B,Test,Millie,"January 6, 1890","December 23, 1956",6,6,,0,0,,1,39.424239,-85.045328,0,F
-FC0202,M-202-004,M-202-004C,Test,Nellie,"January 7, 1890","December 24, 1956",7,7,,0,0,,1,39.424239,-85.045328,0,F
-FC0202,M-202-005,M-202-005A,Test,Sarah,"January 8, 1890","December 25, 1956",8,8,,0,0,,0,39.424255,-85.045335,0,F
-FC0202,M-202-005,M-202-005B,Test,Farah,"January 9, 1890","December 26, 1956",9,9,,0,0,,0,39.424255,-85.045335,0,F
-FC0202,M-202-006,M-202-006,Test,Frank,"January 10, 1890","December 27, 1956",10,10,,0,0,,0,39.424255,-85.045328,0,M
-FC0202,M-202-007,M-202-007,Test,Hank,"January 11, 1800","December 28, 1956",11,11,,1,American Civil War,"Company Z, 110th Hawaii Cavalry",1,39.424255,-85.045321,1,M
-UC001,M-001-001,M-001-001,Jinglehiemer,John,"Jan 10, 1880","Sep 23, 1921",1,1,A dude.,1,World War I,Private First Class,1,39.6464490,-84.8957449,0,M
-UC001,M-001-002,M-001-002,Unknown,,,,,,,0,,,0,39.6471099,-84.8957020,0,
+CEMETERY_ID,MARKER_ID,PERSON_ID,LAST NAME,FIRST NAME,BIRTH,DEATH,ROW,PLOT,ADDITIONAL INFORMATION ON STONE,VETERAN,WAR,VET DETAILS,MAUS,LAT,LONG,PIONEER,SEX,STONE_TYPE
+FC0031,M-031-001,M-031-001,Briggs,Mary,,"February 10, 1905",,,Wife of William,0,0,,0,,,1,F,
+FC0031,M-031-002,M-031-002,Briggs,William,,"March 12, 1905",,,,0,0,,0,,,1,M,
+FC0031,M-031-003,M-031-003,Higgs,Martha,"December 25, 1784","August 16, 1849",,,,0,0,,0,,,1,F,
+FC0031,M-031-004,M-031-004,Higgs,William,"February 9, 1778","April 4, 1852",,,,0,0,,0,,,1,M,
+FC0031,M-031-005,M-031-005,Stewart,Elizabeth,"April 4, 1845","May 9, 1874",,,Wife of George W. Stewart,0,0,,0,,,1,F,
+FC0031,M-031-006,M-031-006,Stewart,George,"October 16, 1850","November 18, 1879",,,Son of A & F Stewart,0,0,,0,,,1,M,
+FC0031,M-031-007,M-031-007,Stewart,Martha J.,"July 27, 1864","September 12, 1864",,,Daughter of George and Elizabeth,0,0,,0,,,1,F,
+FC0031,M-031-008,M-031-008,Stewart,Mathew,"March 21, 1814","January 27, 1856",,,,0,0,,0,,,1,M,
+FC0031,M-031-009,M-031-009,Stewart,Infant,"August 2, 1872","August 23, 1872",,,Son of George and Elizabeth,0,0,,0,,,1,M,
+FC0031,M-031-010,M-031-010,Warne,Elizabeth,"May 6, 1836","April 14, 1864",,,,0,0,,0,,,1,F,
+FC0031,M-031-011,M-031-011,Warne,Elijah,"January 1, 1890","December 18, 1956",1,1,,1,American Civil War,"Company C, 58th Indiana Infantry",0,,,1,M,
+FC0202,M-202-001,M-202-001,Test,Bill,"January 2, 1890","December 19, 1956",2,2,,0,0,,0,39.424239,-85.045349,0,M,
+FC0202,M-202-002,M-202-002,Test,Will,"January 3, 1890","December 20, 1956",3,3,,0,0,,0,39.424239,-85.045342,0,M,
+FC0202,M-202-003,M-202-003,Test,Phil,"January 4, 1890","December 21, 1956",4,4,,0,0,,0,39.424239,-85.045335,0,M,
+FC0202,M-202-004,M-202-004A,Test,Gill,"January 5, 1890","December 22, 1956",5,5,,0,0,,1,39.424239,-85.045328,0,M,
+FC0202,M-202-004,M-202-004B,Test,Millie,"January 6, 1890","December 23, 1956",6,6,,0,0,,1,39.424239,-85.045328,0,F,
+FC0202,M-202-004,M-202-004C,Test,Nellie,"January 7, 1890","December 24, 1956",7,7,,0,0,,1,39.424239,-85.045328,0,F,
+FC0202,M-202-005,M-202-005A,Test,Sarah,"January 8, 1890","December 25, 1956",8,8,,0,0,,0,39.424255,-85.045335,0,F,
+FC0202,M-202-005,M-202-005B,Test,Farah,"January 9, 1890","December 26, 1956",9,9,,0,0,,0,39.424255,-85.045335,0,F,
+FC0202,M-202-006,M-202-006,Test,Frank,"January 10, 1890","December 27, 1956",10,10,,0,0,,0,39.424255,-85.045328,0,M,
+FC0202,M-202-007,M-202-007,Test,Hank,"January 11, 1800","December 28, 1956",11,11,,1,American Civil War,"Company Z, 110th Hawaii Cavalry",1,39.424255,-85.045321,1,M,
+UC001,M-001-001,M-001-001,Jinglehiemer,John,"Jan 10, 1880","Sep 23, 1921",1,1,A dude.,1,World War I,Private First Class,1,39.6464490,-84.8957449,0,M,Above Ground (Single Interment)
+UC001,M-001-002,M-001-002,Unknown,,,,,,,0,,,0,39.6471099,-84.8957020,0,,
