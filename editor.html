@@ -221,7 +221,7 @@ function bbox(r) {
 
 function setMode(m, text) {
   mode = m; const h = $("#hint"); h.hidden = !m; h.textContent = "";
-  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county" || m === "area") ? "Done" : "Cancel", onclick:() => { setMode(null); refresh(); } }));
+  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county" || m === "area") ? "Done" : "Cancel", onclick:() => { if (m === "bound") autoSize(); setMode(null); refresh(); } }));
   map.getCanvas().style.cursor = m ? "crosshair" : "";
   if (ready) refresh();
 }
@@ -323,6 +323,28 @@ function hazardBox(box, r) {
   box.append(b);
 }
 
+// ---------- size from boundary ----------
+// Under 1 acre: best-fit rectangle in feet, rounded to 5 ft (like "100' x 60'"). 1 acre or more: just the acres number (the page adds the word "acres").
+function measure(ring) {
+  const kx = 111320 * Math.cos(ring[0][1] * Math.PI / 180), ky = 110540;
+  const P = ring.slice(0, -1).map(c => [(c[0] - ring[0][0]) * kx, (c[1] - ring[0][1]) * ky]);
+  let a = 0; P.forEach((p, i) => { const q = P[(i + 1) % P.length]; a += p[0] * q[1] - q[0] * p[1]; });
+  const acres = Math.abs(a) / 2 / 4046.856; let best = null;
+  P.forEach((p, i) => {
+    const q = P[(i + 1) % P.length], t = Math.atan2(q[1] - p[1], q[0] - p[0]), c = Math.cos(t), s = Math.sin(t);
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    P.forEach(r => { const x = r[0] * c + r[1] * s, y = -r[0] * s + r[1] * c; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+    if (!best || (x1 - x0) * (y1 - y0) < best.a) best = { a:(x1 - x0) * (y1 - y0), w:x1 - x0, h:y1 - y0 };
+  });
+  const ft = m => Math.max(5, Math.round(m * 3.28084 / 5) * 5), d = [ft(best.w), ft(best.h)].sort((u, v) => v - u);
+  return { acres, text:acres >= 1 ? acres.toFixed(1) : d[0] + "' x " + d[1] + "'" };
+}
+function autoSize() {   // fills Size when leaving boundary editing, but only if Size is still empty
+  const r = cem(), ring = ringOf(holder(sel)), v = r && (r.SIZE || "").trim().toLowerCase();
+  if (!ring || (v && v !== "unknown")) return;
+  r.SIZE = measure(ring).text; if (!cemF.includes("SIZE")) cemF.push("SIZE"); touch("cem");
+}
+
 // ---------- location field ----------
 function coordBox(box, row, key) {
   const c = ll(row), i = el("input", { value:c ? c[1] + ", " + c[0] : "", placeholder:"39.12345, -85.12345" });
@@ -394,6 +416,11 @@ function drawCem() {
         h.geometry = { type:"Polygon", coordinates:[[[c[0]-d,c[1]-d],[c[0]+d,c[1]-d],[c[0]+d,c[1]+d],[c[0]-d,c[1]+d],[c[0]-d,c[1]-d]]] }; touch("bounds"); }
       setMode("bound", "Drag white squares to reshape. Click the map to add a corner. Double-click a square to delete it."); } }),
     ringOf(f) ? el("button", { className:"bad", textContent:"Remove", onclick:() => { if (confirm("Remove this cemetery's boundary?")) { f.geometry = null; touch("bounds"); refresh(); } } }) : ""]));
+  if (ringOf(f)) {
+    const m = measure(ringOf(f));
+    b.append(el("div", {}, [el("small", { textContent:"Measures about " + (m.text.includes("'") ? m.text + " (" + m.acres.toFixed(2) + " acres)" : m.text + " acres") })]),
+      el("button", { textContent:"Set Size from boundary", onclick:() => { r.SIZE = measure(ringOf(holder(sel))).text; if (!cemF.includes("SIZE")) cemF.push("SIZE"); touch("cem"); drawCem(); } }));
+  }
   box.append(b);
 
   const en = el("div", { className:"box" }, [el("b", { textContent:"Entrances" })]);
