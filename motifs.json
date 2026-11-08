@@ -1,0 +1,237 @@
+{
+ "intro": "Gravestone symbols can mean different things depending on the time, the place and the carver, so treat these as common readings, not rules. Tap any name to read more.",
+ "sections": [
+  {
+   "title": "Symbols on Stones",
+   "groups": [
+    {
+     "name": "Botanical",
+     "items": [
+      {
+       "name": "Rose",
+       "meaning": "Often love and beauty. A rose with a broken or unopened bud is often read as a young life cut short."
+      },
+      {
+       "name": "Lily",
+       "meaning": "Often purity and innocence, and sometimes resurrection. It was a common choice for women and children."
+      },
+      {
+       "name": "Wheat Sheaf",
+       "meaning": "Often a long life ending at its natural close, like a finished harvest. It can also stand for bread in Christian symbolism."
+      },
+      {
+       "name": "Oak Leaves",
+       "meaning": "Often strength, endurance and honor. Oak leaves with acorns can suggest a strong, steady life."
+      },
+      {
+       "name": "Ivy",
+       "meaning": "Often faithfulness, friendship and memory. Ivy stays green all year, so it also stands for everlasting life."
+      },
+      {
+       "name": "Willow",
+       "meaning": "Often mourning and grief. The weeping willow was very popular on Victorian-era stones, and it is often paired with an urn."
+      }
+     ]
+    },
+    {
+     "name": "Human Figures",
+     "items": [
+      {
+       "name": "Pointing Hand",
+       "meaning": "Often a hand pointing upward, showing the soul's journey to heaven."
+      },
+      {
+       "name": "Clasped Hands",
+       "meaning": "Often a farewell between the living and the dead, or the bond of marriage. Sometimes the shirt cuffs are different, which is said to show a man and a woman."
+      },
+      {
+       "name": "Angel",
+       "meaning": "Often a messenger or guardian who carries the soul to heaven."
+      },
+      {
+       "name": "Cherub",
+       "meaning": "Often a winged child's head or figure. It is commonly seen on children's graves and stands for innocence."
+      },
+      {
+       "name": "Weeping Figure",
+       "meaning": "Often a mourning woman, sometimes draped over a stone or urn. It stands for grief and loss, and became popular in the later 1800s."
+      }
+     ]
+    },
+    {
+     "name": "Objects",
+     "items": [
+      {
+       "name": "Urn",
+       "meaning": "Often a vessel for the spirit and a classical sign of death. It became popular with the classical revival styles of the 1800s."
+      },
+      {
+       "name": "Draped Urn",
+       "meaning": "Often an urn covered with cloth. The drape is usually read as the veil between life and death, or as mourning."
+      },
+      {
+       "name": "Hourglass",
+       "meaning": "Often the passing of time and the shortness of life. A winged hourglass is sometimes read as time flying."
+      },
+      {
+       "name": "Inverted Torch",
+       "meaning": "Often a life put out. A torch turned downward is a common symbol for death."
+      },
+      {
+       "name": "Book",
+       "meaning": "Often the Bible or the Book of Life. An open book can also show faith, learning or the record of a life."
+      }
+     ]
+    },
+    {
+     "name": "Mortality",
+     "items": [
+      {
+       "name": "Winged Death's Head",
+       "meaning": "Often a skull with wings, showing death and the soul's flight. It was most common on stones from the 1700s and is less often seen on later pioneer-era stones."
+      },
+      {
+       "name": "Skull & Crossbones",
+       "meaning": "Often a reminder of death. It can also appear on stones of some fraternal groups."
+      },
+      {
+       "name": "Broken Column",
+       "meaning": "Often a life cut short, especially a person in their prime or the head of a family. It is also found on some fraternal stones."
+      },
+      {
+       "name": "Scythe",
+       "meaning": "Often death as the reaper, and the end of life. A scythe with wheat can mean the harvest of a life."
+      }
+     ]
+    },
+    {
+     "name": "Animals",
+     "items": [
+      {
+       "name": "Lamb",
+       "meaning": "Often innocence, and very common on children's graves. It also recalls the Lamb of God in Christian symbolism."
+      },
+      {
+       "name": "Dove",
+       "meaning": "Often peace, the Holy Spirit, or the soul itself. A dove carrying an olive branch can stand for peace."
+      }
+     ]
+    },
+    {
+     "name": "Faith",
+     "items": [
+      {
+       "name": "Cross",
+       "meaning": "Often Christian faith and resurrection. Crosses come in many forms, and some carry added meanings."
+      },
+      {
+       "name": "Anchor",
+       "meaning": "Often hope and steadfastness. It was an early Christian symbol and is sometimes found on the graves of sailors."
+      }
+     ]
+    },
+    {
+     "name": "Fraternal Groups",
+     "items": [
+      {
+       "name": "Square & Compass",
+       "meaning": "Often the emblem of the Freemasons, sometimes with a letter G in the middle."
+      },
+      {
+       "name": "Three Links",
+       "meaning": "Often the emblem of the Odd Fellows (I.O.O.F.), often read as friendship, love and truth."
+      },
+      {
+       "name": "Tree Stump",
+       "meaning": "Often the Woodmen of the World, a society that gave many members stone memorials shaped like tree stumps or logs. It can also suggest a life cut short."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Marker Types",
+   "groups": [
+    {
+     "name": "",
+     "items": [
+      {
+       "name": "Flush With Ground",
+       "meaning": "A marker laid level with the grass. It is easy to miss, and often easier to mow around."
+      },
+      {
+       "name": "Flat Tablet / Slab",
+       "meaning": "A low, flat or slightly sloped stone that lies close to the ground."
+      },
+      {
+       "name": "Obelisk / Column / Monument",
+       "meaning": "A tall, pointed or column-shaped stone. It often marks a family plot, and often showed a family's status."
+      },
+      {
+       "name": "Standing (Vertical) Block / Arch / Slab",
+       "meaning": "The classic upright headstone, with a flat, rounded or arched top."
+      },
+      {
+       "name": "Military Marker (Official)",
+       "meaning": "A government-issued stone for a service member, usually with a name, rank, unit and dates."
+      },
+      {
+       "name": "Boulder / Rock",
+       "meaning": "A natural stone or fieldstone, sometimes with a plaque. Rough fieldstones are often the only markers of early graves."
+      },
+      {
+       "name": "Above Ground (Single Interment)",
+       "meaning": "A raised tomb for one burial, such as a box or table tomb resting on supports."
+      },
+      {
+       "name": "Above Ground Structure (Mausoleum, etc.)",
+       "meaning": "A building-like tomb that can hold more than one burial."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Monument Forms",
+   "groups": [
+    {
+     "name": "",
+     "items": [
+      {
+       "name": "Table Grave",
+       "meaning": "A large, above-ground stone structure featuring a flat horizontal slab or stone block supported by legs, pedestals, or low stone walls. The body is buried in the ground beneath it."
+      },
+      {
+       "name": "Box Tomb",
+       "meaning": "A rectangular, solid-sided stone structure shaped like a chest, usually with a slab on top. The burial is usually in the ground beneath it."
+      },
+      {
+       "name": "Ledger Stone",
+       "meaning": "A flat, rectangular slab laid horizontally over a grave, often covering most of it and often carved with a long inscription."
+      },
+      {
+       "name": "Pedestal Tomb",
+       "meaning": "A monument with a raised base (the pedestal) that holds a taller element such as an urn, column or statue. It often marks a family plot."
+      },
+      {
+       "name": "Sarcophagus",
+       "meaning": "A large stone monument shaped like a coffin, shown above ground and often carved. It is often a symbolic monument, with the burial in the ground beneath it."
+      },
+      {
+       "name": "Cenotaph",
+       "meaning": "A memorial to someone who is buried somewhere else, or whose body was never recovered."
+      },
+      {
+       "name": "Footstone",
+       "meaning": "A small marker set at the foot of a grave, often with just initials and a year, facing the headstone at the other end."
+      },
+      {
+       "name": "Plot Curbing",
+       "meaning": "A low stone border around a family plot, sometimes with posts or a gate, which marks the edge of the family's burial space."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -55,7 +55,7 @@ small{color:#6b6258}
     <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
   </div>
-  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button></div>
+  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button></div>
 
   <div class="pane on" id="set">
     <label>Map Name</label><input id="sname">
@@ -92,8 +92,11 @@ small{color:#6b6258}
   </div>
 
   <div class="pane" id="grv"><div id="gdet"></div></div>
+
+  <div class="pane" id="gui"></div>
 </aside>
 <div id="map"><div id="hint" hidden></div><button id="bm">Street Map</button></div>
+<input type="file" id="gfile" accept=".json" hidden>
 <input type="file" id="files" multiple accept=".csv,.json,.geojson" hidden>
 
 <script>
@@ -126,17 +129,18 @@ const COL = [["accent","Page Header"],["public","Public Cemeteries"],["permissio
 const CEM_DEF = "ID,NAME,OTHER_NAMES,SHAARD_ID,TOWNSHIP,PLSS,LAT,LONG,COORD_SOURCE,ESTABLISHED,HIDE,CONDITION,HAZARDS,ACCESS,ACTIVE,SIZE,GRAVES_ESTIMATE,GRAVE_RECORDED,VETERANS,PIONEERS,HAS_GRAVES,SURVEY_STATUS,SURVEY_DATE,PHOTOS,LAST_UPDATED,PUBLIC_NOTES,LOCATION_DETAILS".split(",");
 const INT_DEF = "CEMETERY_ID,MARKER_ID,PERSON_ID,LAST NAME,FIRST NAME,BIRTH,DEATH,ROW,PLOT,ADDITIONAL INFORMATION ON STONE,VETERAN,WAR,VET DETAILS,MAUS,LAT,LONG,PIONEER,SEX".split(",");
 const COLOR_DEF = { accent:"#01796F", public:"#01796F", permission:"#C9A227", private:"#D2691E", inaccessible:"#8B0000", unknown:"#777777", boundary:"#01796F", county:"#555555", grave:"#3f3528" };
-const FILES_DEF = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"cemetery-boundaries.geojson", county:"county.geojson" };
+const FILES_DEF = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"cemetery-boundaries.geojson", county:"county.geojson", motifs:"motifs.json" };
 
 // ---------- state ----------
 let S, cems, cemF, ints, intF, bounds, county, dir, sel, selG, mode, ready, tmp = [];
 const dirty = new Set();
+let guide = null;   // the visitor guide (motifs.json)
 let hadSettings = false;   // true when a settings.json was found on open
 const photos = new Map();   // pending photos: path in the repository -> image Blob
 function blank() {
   S = { name:"", shortName:"", idPrefix:"FC", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
   cems = []; cemF = CEM_DEF.slice(); ints = []; intF = INT_DEF.slice();
-  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear(); hadSettings = false;
+  bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear(); hadSettings = false; guide = null;
 }
 blank();
 const cem = () => cems.find(r => r.ID === sel);
@@ -637,6 +641,47 @@ $("#ofile").onchange = async e => {
   } catch (err) { say("Couldn't read that picture: " + err.message); }
 };
 
+// ---------- guides: grave symbols and monument forms shown to visitors ----------
+const guideOpen = new Set();   // which groups are expanded, kept across redraws
+function drawGuide() {
+  const box = $("#gui"); box.textContent = "";
+  if (!guide) { box.append(el("small", { textContent:"Open the map files first." })); return; }
+  const chg = () => touch("guide");
+  box.append(el("small", { textContent:"These explanations appear in the visitor guide on the map page. A section holds groups, and a group holds entries." }),
+    el("label", { textContent:"Introduction" }), el("textarea", { value:guide.intro || "", onchange:e => { guide.intro = e.target.value; chg(); } }));
+  guide.sections.forEach((sec, si) => {
+    const sb = el("div", { className:"box" });
+    sb.append(el("label", { textContent:"Section Title" }), el("input", { value:sec.title || "", onchange:e => { sec.title = e.target.value; chg(); } }));
+    (sec.groups = sec.groups || []).forEach((g, gi) => {
+      const k = si + "/" + gi, d = el("details", {}, [el("summary", { textContent:(g.name || "(Entries)") + " (" + (g.items || []).length + ")" })]);
+      d.open = guideOpen.has(k); d.ontoggle = () => { if (d.open) guideOpen.add(k); else guideOpen.delete(k); };
+      d.append(el("label", { textContent:"Group Name (Leave Blank for None)" }), el("input", { value:g.name || "", onchange:e => { g.name = e.target.value; chg(); drawGuide(); } }));
+      (g.items = g.items || []).forEach((it, ii) => d.append(el("div", { className:"box" }, [
+        el("input", { value:it.name || "", placeholder:"Name", onchange:e => { it.name = e.target.value; chg(); } }),
+        el("textarea", { value:it.meaning || "", placeholder:"What it means", onchange:e => { it.meaning = e.target.value; chg(); } }),
+        el("button", { className:"bad", textContent:"Delete Entry", onclick:() => { g.items.splice(ii, 1); chg(); drawGuide(); } })])));
+      d.append(el("div", { className:"row" }, [
+        el("button", { textContent:"+ Add Entry", onclick:() => { guideOpen.add(k); g.items.push({ name:"New Entry", meaning:"" }); chg(); drawGuide(); } }),
+        el("button", { className:"bad", textContent:"Delete Group", onclick:() => { if (confirm("Delete this whole group?")) { sec.groups.splice(gi, 1); chg(); drawGuide(); } } })]));
+      sb.append(d);
+    });
+    sb.append(el("div", { className:"row" }, [
+      el("button", { textContent:"+ Add Group", onclick:() => { sec.groups.push({ name:"New Group", items:[] }); chg(); drawGuide(); } }),
+      el("button", { className:"bad", textContent:"Delete Section", onclick:() => { if (confirm("Delete this whole section?")) { guide.sections.splice(si, 1); chg(); drawGuide(); } } })]));
+    box.append(sb);
+  });
+  box.append(el("div", { className:"row" }, [
+    el("button", { className:"go", textContent:"+ Add Section", onclick:() => { guide.sections.push({ title:"New Section", groups:[{ name:"", items:[] }] }); chg(); drawGuide(); } }),
+    el("button", { textContent:"Load Guide File…", onclick:() => $("#gfile").click() })]));
+}
+$("#gfile").onchange = async e => {
+  try {
+    const j = JSON.parse((await e.target.files[0].text()).replace(/^\uFEFF/, "")); if (!Array.isArray(j.sections)) throw new Error("that isn't a guide file");
+    guide = j; touch("guide"); drawGuide();
+  } catch (err) { say("Couldn't load that guide: " + err.message); }
+  e.target.value = "";
+};
+
 // ---------- Map (settings) tab ----------
 COL.forEach(([k, label]) => $("#cols").append(el("div", { className:"row" }, [
   el("input", { type:"color", id:"col-" + k, oninput:e => { S.colors[k] = e.target.value; touch("settings"); applyColors(); } }), label])));
@@ -708,7 +753,8 @@ async function load(files) {
       else if (F.includes("ID") && F.includes("NAME")) { cems = p.data; cemF = F; S.files.cemeteries = n; got.push(n); }
     } else {
       let j; try { j = JSON.parse(text); } catch (e) { continue; }
-      if (j.colors || j.files) { S = Object.assign(S, j); S.colors = Object.assign({}, COLOR_DEF, j.colors); S.files = Object.assign({}, FILES_DEF, j.files); hadSettings = true; got.push(n); }
+      if (Array.isArray(j.sections)) { guide = j; S.files.motifs = n; got.push(n); }
+      else if (j.colors || j.files) { S = Object.assign(S, j); S.colors = Object.assign({}, COLOR_DEF, j.colors); S.files = Object.assign({}, FILES_DEF, j.files); hadSettings = true; got.push(n); }
       else if (j.type === "FeatureCollection" && (!j.features.length || j.features.some(x => x.properties && x.properties.CEMETERY_ID))) { bounds = j; S.files.boundaries = n; got.push(n); }
       else if (j.type === "Feature" || j.type === "FeatureCollection") { try { county = pickCounty(j); S.files.county = n; got.push(n); } catch (e) { } }
     }
@@ -717,6 +763,8 @@ async function load(files) {
   if (S.center) map.jumpTo({ center:S.center, zoom:S.zoom }); else fitCounty();
   $("#save").disabled = true; $("#save").className = "";
   tab("set"); drawSet(); refresh();
+  if (!guide) guide = { intro:"", sections:[] };
+  drawGuide();
   if (!S.overlays) S.overlays = S.files.county === "franklin-county.geojson" ? JSON.parse(JSON.stringify(LEGACY_OVERLAYS)) : [];   // Franklin's three old maps used to live inside test3
   ov = null;
   takeSnap();
@@ -734,7 +782,7 @@ $("#open").onclick = async () => {
 $("#files").onchange = e => { dir = null; load([...e.target.files]); };
 $("#new").onclick = () => {
   const n = prompt("Name of the new map (for example: Fayette County Cemeteries)"); if (!n) return;
-  blank(); S.name = n; S.overlays = []; dir = null; tab("set"); drawSet(); refresh();
+  blank(); S.name = n; S.overlays = []; guide = { intro:"", sections:[] }; drawGuide(); dir = null; tab("set"); drawSet(); refresh();
   say("New map started. Next, on the Map tab, search for your county or town outline.");
 };
 
@@ -840,6 +888,7 @@ function outFiles() {
   if (dirty.has("ints")) o.push([S.files.interments, Papa.unparse(ints, { columns:intF })]);
   if (dirty.has("bounds")) o.push([S.files.boundaries, JSON.stringify(bounds, null, 1)]);
   if (dirty.has("county") && county) o.push([S.files.county, JSON.stringify(county, null, 1)]);
+  if (dirty.has("guide") && guide) o.push([S.files.motifs || "motifs.json", JSON.stringify(guide, null, 1)]);
   photos.forEach((blob, path) => o.push([path, blob]));
   return o;
 }
@@ -861,7 +910,7 @@ $("#save").onclick = async () => {
 $("#dlBtn").onclick = () => { if (cems.length) outFiles().forEach(([n, t]) => dl(n, t)); };
 window.onbeforeunload = e => { if (dirty.size) { e.preventDefault(); return ""; } };
 // ---------- opening the map files from the site, or straight from the GitHub repository ----------
-const LEGACY_NAMES = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson" };   // names used before settings.json existed
+const LEGACY_NAMES = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson", motifs:"motifs.json" };   // names used before settings.json existed
 async function filesFrom(get) {   // get(name) returns a File, or null when the file doesn't exist
   const set = await get("settings.json");
   let names = LEGACY_NAMES;
