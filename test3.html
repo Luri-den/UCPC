@@ -1060,12 +1060,12 @@ const map = new maplibregl.Map({
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",   // fonts for text labels (entrance names)
         sources: {
 
-            "osm-tiles": {   // street map: USGS Topo (public data). The id keeps its old name so the rest of the page still works.
+            "osm-tiles": {
                 type: "raster",
-                tiles: ["https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}"],
+                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
                 tileSize: 256,
-                maxzoom: 16,
-                attribution: "USGS The National Map"
+                maxzoom: 19,
+                attribution: "© OpenStreetMap contributors"
             },
 
             "usgs-tiles": {

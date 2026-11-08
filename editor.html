@@ -76,6 +76,12 @@ small{color:#6b6258}
     <small>Visitors can't scroll outside of this red box. The Red Pin is the starting point: Drag it to change it.</small>
     <div class="row"><button id="aedit">Edit Box</button><button id="afit">Fit to Outline</button><button id="aview">Use Screen</button></div>
     <input type="file" id="cfile" accept=".json,.geojson" hidden>
+    <h3>Historical Overlays</h3>
+    <small>Old maps drawn over the base map. Visitors switch them on from the page.</small>
+    <div class="list" id="olist"></div>
+    <div class="row"><button id="oadd" class="go">+ Add Overlay</button></div>
+    <div id="odet"></div>
+    <input type="file" id="ofile" accept="image/*" hidden>
   </div>
 
   <div class="pane" id="cem">
@@ -138,10 +144,11 @@ function say(t) { $("#msg").textContent = t; }
 function touch(k) { dirty.add(k); $("#save").disabled = false; $("#save").className = "go"; say("You have unsaved changes."); }
 
 // ---------- map ----------
+const WEB = /^https?:/.test(location.protocol);   // OpenStreetMap refuses pages opened from a file on a computer, so the street map falls back to USGS Topo there
 const map = new maplibregl.Map({
   container: "map", center: [-98, 39], zoom: 3, maxZoom: 21,
   style: { version: 8, sources: {
-      street: { type:"raster", tiles:["https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:16, attribution:"USGS The National Map" },
+      street: WEB ? { type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, maxzoom:19, attribution:"© OpenStreetMap contributors" } : { type:"raster", tiles:["https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:16, attribution:"USGS The National Map" },
       aerial: { type:"raster", tiles:["https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:16, attribution:"Imagery: USGS The National Map / USDA NAIP" },
       indiana: { type:"raster", tiles:["https://di-ingov.img.arcgis.com/arcgis/rest/services/DynamicWebMercator/Indiana_Current_Imagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpgpng&f=image"], tileSize:256, maxzoom:20, attribution:"Imagery: Indiana Geographic Information Office (IGIO)" } },
     layers: [{ id:"street", type:"raster", source:"street" }, { id:"aerial", type:"raster", source:"aerial" }, { id:"indiana", type:"raster", source:"indiana" }] }
@@ -225,7 +232,7 @@ function bbox(r) {
 
 function setMode(m, text) {
   mode = m; const h = $("#hint"); h.hidden = !m; h.textContent = "";
-  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county" || m === "area") ? "Done" : "Cancel", onclick:() => { if (m === "bound") autoSize(); setMode(null); refresh(); } }));
+  if (m) h.append(text + " ", el("button", { textContent:(m === "bound" || m === "county" || m === "area" || m === "ovpos") ? "Done" : "Cancel", onclick:() => { if (m === "bound") autoSize(); setMode(null); refresh(); } }));
   map.getCanvas().style.cursor = m ? "crosshair" : "";
   if (ready) refresh();
 }
@@ -289,10 +296,16 @@ function refresh() {
   if (mode === "bound" && ringOf(f)) vertexMarkers(ringOf(f), "bounds", "bnd", bf);
   if (mode === "county" && ringOf(county)) vertexMarkers(ringOf(county), "county", "cnty", cf);
   if (mode === "area" && A) [[0, 0], [1, 1]].forEach(([i, j]) => drag([A[i][0], A[j][1]], "vtx", p => { A[i][0] = p[0]; A[j][1] = p[1]; touch("settings"); refresh(); }, "Drag to resize"));
+  if (mode === "ovpos" && ov) {
+    const c = corners(ov);
+    [[0, "Top Left"], [1, "Top Right"], [3, "Bottom Left"]].forEach(([i, nm]) => drag(c[i], "vtx", p => { moveCorner(ov, i, p); touch("settings"); refresh(); }, "Drag to Stretch or Turn (" + nm + ")"));
+    drag([(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2], "pin cem", p => { shiftOverlay(ov, p); touch("settings"); refresh(); }, "Drag to Move the Whole Overlay");
+  }
+  ovView();
   if (curTab === "set" && S.center) drag(S.center, "pin start", p => { S.center = p; touch("settings"); drawSet(); }, "Starting Point (Drag to Move)");
   if (selG && ll(selG)) drag(ll(selG), "pin gr", p => { moveStone(selG, p[1], p[0]); touch("ints"); refresh(); }, "Drag to move this grave");
 
-  drawCem(); drawGrv();
+  drawCem(); drawGrv(); drawOv();
 }
 
 // ---------- forms ----------
@@ -537,6 +550,74 @@ map.on("click", e => {
   const r = cem(); r.LAT = +e.lngLat.lat.toFixed(7); r.LONG = +e.lngLat.lng.toFixed(7); touch("cem"); setMode(null);
 });
 
+const LEGACY_OVERLAYS = [
+  { id:"franklin-1882-layer", label:"1882 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/cropped-franklin-1882.jpg", width:3497, height:2926,
+    controlPoints:[[475,850,-85.298653,39.525454],[3105,825,-84.810676,39.521903],[3080,2310,-84.815210,39.309328],[465,2610,-85.299317,39.267088]] },
+  { id:"franklin-1910-layer", label:"1910 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/franklin-1910.jpg", width:11556, height:9198,
+    controlPoints:[[1221,2525,-85.298653,39.525454],[8876,2577,-84.810676,39.521903],[8902,7159,-84.815210,39.309328],[1334,8000,-85.299317,39.267088]] },
+  { id:"franklin-1936-layer", label:"1936 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/franklin-1936.jpg", width:12811, height:10791,
+    controlPoints:[[2721,1624,-85.298653,39.525454],[10390,1686,-84.810676,39.521903],[10390,6190,-84.815210,39.309328],[2750,6940,-85.299317,39.267088]] }
+];
+let ov = null;   // the overlay being previewed or positioned
+const blobUrls = new Map();   // preview addresses for pictures not published yet
+function solve3(M, b) {
+  const d = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const D = d(M); return [0, 1, 2].map(i => d(M.map((r, j) => r.map((v, k) => k === i ? b[j] : v))) / D);
+}
+function fit(o) {   // picture pixel (x, y) -> [lon, lat], a best fit through the control points, like test3 does
+  const A = [[0,0,0],[0,0,0],[0,0,0]], bl = [0,0,0], bt = [0,0,0];
+  o.controlPoints.forEach(([x, y, lon, lat]) => { const v = [x, y, 1]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) A[i][j] += v[i] * v[j]; bl[i] += v[i] * lon; bt[i] += v[i] * lat; } });
+  const L = solve3(A, bl), T = solve3(A, bt);
+  return (x, y) => [L[0] * x + L[1] * y + L[2], T[0] * x + T[1] * y + T[2]];
+}
+const corners = o => { const f = fit(o); return [f(0, 0), f(o.width, 0), f(o.width, o.height), f(0, o.height)]; };   // top left, top right, bottom right, bottom left
+function setCorners(o, tl, tr, bl) {   // the fourth corner follows, so the picture is never twisted out of shape
+  const br = [tr[0] + bl[0] - tl[0], tr[1] + bl[1] - tl[1]];
+  o.controlPoints = [[0, 0, ...tl], [o.width, 0, ...tr], [o.width, o.height, ...br], [0, o.height, ...bl]];
+}
+function moveCorner(o, i, p) { const c = corners(o), n = [c[0], c[1], c[3]], k = { 0: 0, 1: 1, 3: 2 }[i]; n[k] = p; setCorners(o, n[0], n[1], n[2]); }
+function shiftOverlay(o, p) { const c = corners(o), m = [(c[0][0] + c[2][0]) / 2, (c[0][1] + c[2][1]) / 2], d = [p[0] - m[0], p[1] - m[1]], mv = q => [q[0] + d[0], q[1] + d[1]]; setCorners(o, mv(c[0]), mv(c[1]), mv(c[3])); }
+function ovView() {   // shows the overlay being edited, half see-through, on the editor map
+  if (!ready) return;
+  const on = !!ov, c = on && corners(ov), url = on && (photos.has(ov.url) ? (blobUrls.get(ov.url) || blobUrls.set(ov.url, URL.createObjectURL(photos.get(ov.url))).get(ov.url)) : ov.url);
+  if (!map.getSource("ovedit")) {
+    if (!on) return;
+    map.addSource("ovedit", { type:"image", url, coordinates:c });
+    map.addLayer({ id:"ovedit", type:"raster", source:"ovedit", paint:{ "raster-opacity":0.6 } }, "cnty");
+  } else if (on) map.getSource("ovedit").updateImage({ url, coordinates:c });
+  if (map.getLayer("ovedit")) map.setLayoutProperty("ovedit", "visibility", on ? "visible" : "none");
+}
+function drawOv() {
+  const list = $("#olist"), box = $("#odet"); list.textContent = ""; box.textContent = "";
+  (S.overlays || []).forEach(o => list.append(el("div", { className:o === ov ? "on" : "", textContent:o.label, onclick:() => { ov = o; setMode(null); const c = corners(o); map.fitBounds(bboxOf({ coordinates:[c] }), { padding:40 }); } })));
+  if (!ov) return;
+  const lab = el("input", { value:ov.label, onchange:() => { ov.label = lab.value.trim() || ov.label; touch("settings"); drawOv(); } });
+  box.append(el("label", { textContent:"Name Shown to Visitors" }), lab,
+    el("div", { className:"row" }, [
+      el("button", { className:"go", textContent:"Position on Map", onclick:() => setMode("ovpos", "Drag the white squares to stretch or turn the old map. Drag the yellow pin to move all of it.") }),
+      el("button", { textContent:"Hide Preview", onclick:() => { ov = null; setMode(null); refresh(); } }),
+      el("button", { className:"bad", textContent:"Remove", onclick:() => {
+        if (!confirm("Remove \"" + ov.label + "\" from the map? The picture file stays in your repository.")) return;
+        photos.delete(ov.url); S.overlays = S.overlays.filter(x => x !== ov); ov = null; touch("settings"); refresh(); } })]),
+    el("small", { textContent:"The old map shows half see-through here so you can line it up with the aerial photo." }));
+}
+$("#oadd").onclick = () => $("#ofile").click();
+$("#ofile").onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  try {
+    const bmp = await createImageBitmap(file), label = prompt("Name for this old map (for example: 1895 Union County Map)", file.name.replace(/\.[^.]+$/, "")); if (!label) return;
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "overlay";
+    let id = slug + "-layer", n = 2; while ((S.overlays || []).some(x => x.id === id)) id = slug + "-" + n++ + "-layer";
+    const ext = (file.name.match(/\.(jpe?g|png|webp|gif)$/i) || ["", "jpg"])[1].toLowerCase(), path = "overlays/" + id.replace("-layer", "") + "." + ext;
+    const b = map.getBounds(), cx = map.getCenter(), wDeg = (b.getEast() - b.getWest()) * 0.6, hDeg = wDeg * Math.cos(cx.lat * Math.PI / 180) * bmp.height / bmp.width;
+    const o = { id, label, url:path, width:bmp.width, height:bmp.height, controlPoints:[] };
+    setCorners(o, [cx.lng - wDeg / 2, cx.lat + hDeg / 2], [cx.lng + wDeg / 2, cx.lat + hDeg / 2], [cx.lng - wDeg / 2, cx.lat - hDeg / 2]);
+    (S.overlays = S.overlays || []).push(o); photos.set(path, file); blobUrls.delete(path); ov = o;
+    touch("settings"); touch("photos"); setMode("ovpos", "Drag the white squares to stretch or turn the old map. Drag the yellow pin to move all of it.");
+    if (file.size > 25e6) say("That picture is large (" + Math.round(file.size / 1e6) + " MB). It will be slow for visitors; consider shrinking it.");
+  } catch (err) { say("Couldn't read that picture: " + err.message); }
+};
+
 // ---------- Map (settings) tab ----------
 COL.forEach(([k, label]) => $("#cols").append(el("div", { className:"row" }, [
   el("input", { type:"color", id:"col-" + k, oninput:e => { S.colors[k] = e.target.value; touch("settings"); applyColors(); } }), label])));
@@ -617,6 +698,8 @@ async function load(files) {
   if (S.center) map.jumpTo({ center:S.center, zoom:S.zoom }); else fitCounty();
   $("#save").disabled = true; $("#save").className = "";
   tab("set"); drawSet(); refresh();
+  if (!S.overlays) S.overlays = S.files.county === "franklin-county.geojson" ? JSON.parse(JSON.stringify(LEGACY_OVERLAYS)) : [];   // Franklin's three old maps used to live inside test3
+  ov = null;
   takeSnap();
   const fixed = fixBlankIds();
   say("Opened " + cems.length + " cemeteries and " + ints.length + " graves." + (fixed ? " " + fixed + " cemeteries had no ID, so they were given one. Publish to keep it." : ""));
