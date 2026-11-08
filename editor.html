@@ -50,6 +50,7 @@ small{color:#6b6258}
 <aside>
   <div class="top">
     <button id="open" class="go" style="background:#fff;color:#01796F">Open My Map Files</button>
+    <button id="gopen">Open From GitHub</button>
     <button id="new">New County</button>
     <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
@@ -86,7 +87,7 @@ small{color:#6b6258}
 
   <div class="pane" id="grv"><div id="gdet"></div></div>
 </aside>
-<div id="map"><div id="hint" hidden></div><button id="bm">Aerial View</button></div>
+<div id="map"><div id="hint" hidden></div><button id="bm">Street Map</button></div>
 <input type="file" id="files" multiple accept=".csv,.json,.geojson" hidden>
 
 <script>
@@ -140,17 +141,18 @@ function touch(k) { dirty.add(k); $("#save").disabled = false; $("#save").classN
 const map = new maplibregl.Map({
   container: "map", center: [-98, 39], zoom: 3, maxZoom: 21,
   style: { version: 8, sources: {
-      street: { type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, maxzoom:19, attribution:"© OpenStreetMap contributors" },
-      aerial: { type:"raster", tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:19, attribution:"Imagery © Esri" } },
-    layers: [{ id:"street", type:"raster", source:"street" }, { id:"aerial", type:"raster", source:"aerial", layout:{ visibility:"none" } }] }
+      street: { type:"raster", tiles:["https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:16, attribution:"USGS The National Map" },
+      aerial: { type:"raster", tiles:["https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"], tileSize:256, maxzoom:16, attribution:"Imagery: USGS The National Map / USDA NAIP" },
+      indiana: { type:"raster", tiles:["https://di-ingov.img.arcgis.com/arcgis/rest/services/DynamicWebMercator/Indiana_Current_Imagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpgpng&f=image"], tileSize:256, maxzoom:20, attribution:"Imagery: Indiana Geographic Information Office (IGIO)" } },
+    layers: [{ id:"street", type:"raster", source:"street" }, { id:"aerial", type:"raster", source:"aerial" }, { id:"indiana", type:"raster", source:"indiana" }] }
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "top-right");
 map.addControl(new maplibregl.ScaleControl({ unit:"imperial" }), "bottom-left");
 
 $("#bm").onclick = () => {
-  const aerial = map.getLayoutProperty("aerial", "visibility") !== "visible";
-  map.setLayoutProperty("aerial", "visibility", aerial ? "visible" : "none");
-  $("#bm").textContent = aerial ? "Street map" : "Aerial photo";
+  const aerial = map.getLayoutProperty("aerial", "visibility") === "none";   // aerial starts visible
+  ["aerial", "indiana"].forEach(l => map.setLayoutProperty(l, "visibility", aerial ? "visible" : "none"));
+  $("#bm").textContent = aerial ? "Street Map" : "Aerial View";
 };
 
 map.on("load", () => {
@@ -616,7 +618,8 @@ async function load(files) {
   $("#save").disabled = true; $("#save").className = "";
   tab("set"); drawSet(); refresh();
   takeSnap();
-  say("Opened " + cems.length + " cemeteries and " + ints.length + " graves.");
+  const fixed = fixBlankIds();
+  say("Opened " + cems.length + " cemeteries and " + ints.length + " graves." + (fixed ? " " + fixed + " cemeteries had no ID, so they were given one. Publish to keep it." : ""));
 }
 $("#open").onclick = async () => {
   if (!window.showDirectoryPicker) return $("#files").click();
@@ -643,7 +646,7 @@ const kBnd = f => { const p = f.properties || {}; return p.CEMETERY_ID && !(p.TY
 const toMap = (arr, k) => { const m = new Map(); arr.forEach(x => m.set(k(x), x)); return m; };
 function takeSnap() {
   const c = x => JSON.parse(JSON.stringify(x));
-  snap = { cem:toMap(cems.map(c), kCem), ints:toMap(ints.map(c), kInt), bnd:toMap(bounds.features.map(c), kBnd) };
+  snap = { cem:toMap(cems.filter(r => String(r.ID || "").trim()).map(c), kCem), ints:toMap(ints.map(c), kInt), bnd:toMap(bounds.features.map(c), kBnd) };
 }
 function merge3(B, M, T, sig, label) {
   const out = [], clash = [];
@@ -689,7 +692,7 @@ async function syncFromGitHub() {
     const t = await get(S.files.cemeteries);
     if (t) {
       const p = parse(t), F = [...new Set([...cemF, ...p.meta.fields])];
-      const { out, clash } = merge3(snap.cem, toMap(cems, kCem), toMap(p.data, kCem), sigOf(F), r => r.NAME || r.ID);
+      const { out, clash } = merge3(snap.cem, toMap(cems, kCem), toMap(p.data.filter(r => String(r.ID || "").trim()), kCem), sigOf(F), r => r.NAME || r.ID);
       cems = out; cemF = F; clash.forEach(renumberCem);
     }
   }
@@ -715,6 +718,14 @@ async function syncFromGitHub() {
   if (sel && !cems.some(r => r.ID === sel)) sel = null;
   if (selG && !ints.includes(selG)) selG = null;
   refresh(); say("Checked GitHub and merged other people's changes with yours.");
+}
+
+// Cemeteries with no ID can't be edited or merged, so they get one when the files are opened
+function fixBlankIds() {
+  const blanks = cems.filter(r => !String(r.ID || "").trim()); if (!blanks.length) return 0;
+  let n = Math.max(0, ...cems.map(r => parseInt(String(r.ID).replace(/\D/g, ""), 10) || 0));
+  blanks.forEach(r => r.ID = S.idPrefix + String(++n).padStart(3, "0"));
+  touch("cem"); return blanks.length;
 }
 
 // ---------- saving ----------
@@ -747,16 +758,30 @@ $("#save").onclick = async () => {
 // Hidden button: the GitHub publisher "presses" it to collect the files (see publish.js)
 $("#dlBtn").onclick = () => { if (cems.length) outFiles().forEach(([n, t]) => dl(n, t)); };
 window.onbeforeunload = e => { if (dirty.size) { e.preventDefault(); return ""; } };
-// ---------- open straight from the site this page is served from (GitHub Pages) ----------
-async function loadFromSite() {
-  if (!/^https?:/.test(location.protocol)) return;
-  const get = async n => { try { const r = await fetch(new URL(n, document.baseURI).href, { cache:"no-store" }); return r.ok ? new File([await r.text()], n) : null; } catch (e) { return null; } };
+// ---------- opening the map files from the site, or straight from the GitHub repository ----------
+const LEGACY_NAMES = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson" };   // names used before settings.json existed
+async function filesFrom(get) {   // get(name) returns a File, or null when the file doesn't exist
   const set = await get("settings.json");
-  let names = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson" };   // what the page used before settings.json existed
+  let names = LEGACY_NAMES;
   if (set) { try { names = Object.assign({}, FILES_DEF, JSON.parse(await set.text()).files || {}); } catch (e) {} }
-  const files = (await Promise.all([set].concat(Object.values(names).map(get)))).filter(Boolean);
+  return (await Promise.all([set].concat(Object.values(names).map(get)))).filter(Boolean);
+}
+async function loadFromSite() {   // when this page is served from a website
+  if (!/^https?:/.test(location.protocol)) return;
+  const files = await filesFrom(async n => { try { const r = await fetch(new URL(n, document.baseURI).href, { cache:"no-store" }); return r.ok ? new File([await r.text()], n) : null; } catch (e) { return null; } });
   if (files.length > 1) { say("Reading the map files from this site…"); await load(files); }
 }
+async function loadFromGitHub() {   // works from a file on your computer, and with private repositories
+  if (!window.GHPublish) return say("publish.js is missing. Put it in the same folder as editor.html.");
+  try {
+    say("Reading from GitHub…");
+    const head = await GHPublish.rebase();
+    const files = await filesFrom(async n => { const t = await GHPublish.read(n, head); return t == null ? null : new File([t], n); });
+    if (files.length < 2) return say("I couldn't find the map files in that repository. Check the repository name, branch and token in the ⚙ settings next to Publish.");
+    dir = null; await load(files);
+  } catch (e) { say("Couldn't read from GitHub: " + e.message + " Check the ⚙ settings next to Publish."); }
+}
+$("#gopen").onclick = loadFromGitHub;
 loadFromSite();
 </script>
 <script src="publish.js"></script>
