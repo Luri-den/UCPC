@@ -58,17 +58,42 @@
   const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };
   const inviteKey = "invite:" + AREA, leadKeyName = "leadKey:" + AREA;
   const invite = () => { try { return JSON.parse(store.get(inviteKey) || "null"); } catch (e) { return null; } };
-  const nav = document.querySelector("#menu-panel .menu-links");
-  const surveyLink = document.createElement("a"), editorLink = document.createElement("a"), signLink = document.createElement("a");
-  surveyLink.href = "survey.html"; editorLink.href = "editor.html"; signLink.href = "#";
-  signLink.addEventListener("click", function (e) { e.preventDefault(); openSignIn(); });
+  /* a block at the top of the map menu, so volunteers and the lead can find it:
+       not signed in:  ○ Volunteer / Lead Sign-In (Not Signed In)   ○ Want to help with the surveys? Tap here!
+       signed in:      ⦿ Volunteer / Lead Sign-In (Signed In)       ⦿ Survey / Make Changes (as Name)   ⦿ Review Changes and Additions (lead only) */
+  const panel = document.getElementById("menu-panel");
+  const group = document.createElement("div"); group.id = "vol-group";
+  const gcss = document.createElement("style");
+  gcss.textContent = "#vol-group{margin:10px 0 12px;padding:8px;border:2px solid var(--accent,#01796F);border-radius:10px;background:#fff}" +
+    "#vol-group a{display:flex!important;align-items:center;gap:10px;min-height:44px;padding:4px 6px;color:var(--accent,#01796F);font-weight:600;text-decoration:none;border-radius:6px}" +
+    "#vol-group a:hover{background:#f1efe8}#vol-group a+a{border-top:1px solid #ebe6da}" +
+    "#vol-group .dot{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}" +
+    "#vol-group .dot.on{background:radial-gradient(circle,currentColor 0 4px,transparent 5px)}" +
+    "#vol-group small{display:block;font-weight:400;color:#5f574c;font-size:12px}";
+  document.head.append(gcss);
+  function helpTarget() {
+    const c = SETTINGS.contact || {};
+    if (c.form) return { href: c.form, how: "Fill in the volunteer form" };
+    if (c.email) return { href: "mailto:" + c.email + "?subject=" + encodeURIComponent("Helping with the " + (SETTINGS.name || "cemetery") + " survey"), how: "Email " + (c.name || c.email) };
+    if (c.phone) return { href: "tel:" + String(c.phone).replace(/[^0-9+]/g, ""), how: "Call " + (c.name || c.phone) };
+    return { href: "survey.html", how: "Find out how to get an invite" };
+  }
+  function link(text, sub, href, on, onclick) {
+    const a = document.createElement("a"); a.href = href;
+    a.innerHTML = '<span class="dot' + (on ? " on" : "") + '" aria-hidden="true"></span><span>' + H(text) + (sub ? "<small>" + H(sub) + "</small>" : "") + "</span>";
+    if (onclick) a.addEventListener("click", e => { e.preventDefault(); onclick(); });
+    if (/^(https?:|mailto:|tel:)/.test(href)) { a.target = "_blank"; a.rel = "noopener"; }
+    group.append(a);
+  }
   function menu() {
-    if (!nav) return;
-    const inv = invite(), lead = store.get(leadKeyName);
-    surveyLink.textContent = inv ? "Survey (signed in" + (inv.name ? " as " + inv.name : "") + ")" : "Help Survey (Volunteers)";
-    editorLink.textContent = "Review New Additions (Editor)"; editorLink.style.display = lead ? "" : "none";
-    signLink.textContent = inv || lead ? "Volunteer & Lead Sign-In (signed in)" : "Volunteer & Lead Sign-In";
-    [surveyLink, editorLink, signLink].forEach(a => { if (!a.parentNode) nav.append(a); });
+    if (!panel) return;
+    const inv = invite(), lead = store.get(leadKeyName), signed = !!(inv || lead);
+    group.textContent = "";
+    link("Volunteer / Lead Sign-In", signed ? "Signed in" : "Not signed in", "#", signed, openSignIn);
+    if (inv) link("Survey / Make Changes", "Signed in as " + (inv.name || "a surveyor"), "survey.html", true);
+    else { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
+    if (lead) link("Review Changes and Additions", "Opens the editor", "editor.html", true);
+    if (!group.parentNode) { const title = panel.querySelector(".menu-title"); title ? title.after(group) : panel.prepend(group); }
   }
   if (INBOX && AREA) menu();
 
