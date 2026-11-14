@@ -1,4 +1,13 @@
-/* publish.js - adds a "Publish to GitHub" button next to an editor's Download button.
+/* publish.js - adds a "Publish" button next to an editor's Download button.
+
+   WHERE IT PUBLISHES (the "target") can be switched in the gear dialog, or for everyone in settings.json:
+     "publish": { "target": "github", "owner": "...", "repo": "...", "branch": "" }
+     "publish": { "target": "server", "url": "https://cemeteries.example.gov" }
+   A "server" is anything that answers three requests (county-server.mjs is a ready-made one):
+     GET  <url>/files          -> { "ok": true, "files": ["cemlist.csv", "photos/UC001.jpg", ...] }
+     GET  <url>/files/<path>   -> that file (404 if it does not exist)
+     PUT  <url>/files/<path>   -> saves the request body as that file
+   Every request carries  Authorization: Bearer <publish key>.
 
    How it works: when you click Publish, the editor's own Download button(s) are "pressed" for you,
    but the files are caught instead of downloaded. You review the list (and can fix any folder),
@@ -11,26 +20,57 @@
 (function () {
   "use strict";
 
-  const DEFAULTS = { owner: "Luri-den", repo: "FCPC", branch: "" };   // blank branch = the repo's default
+  const DEFAULTS = { target: "github", owner: "Luri-den", repo: "FCPC", branch: "", serverUrl: "" };   // blank branch = the repo's default
   const SKEY = "ghpublish.cemetery.settings.v1", TKEY = "ghpublish.cemetery.token.v1";
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   /* ---------- settings + token ---------- */
+  // settings.json may carry a "publish" block: the destination everyone's editor uses unless this browser was told otherwise
+  function siteDefault() {
+    try {
+      const p = (typeof S !== "undefined" && S && S.publish) || null; if (!p) return {};
+      const o = {};
+      if (p.target === "server" || p.target === "github") o.target = p.target;
+      if (p.url) o.serverUrl = String(p.url);
+      ["owner", "repo", "branch"].forEach(k => { if (p[k]) o[k] = String(p[k]); });
+      return o;
+    } catch (e) { return {}; }
+  }
   function settings() {
-    try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SKEY) || "{}")); }
+    try { return Object.assign({}, DEFAULTS, siteDefault(), JSON.parse(localStorage.getItem(SKEY) || "{}")); }
     catch (e) { return Object.assign({}, DEFAULTS); }
   }
+  const isServer = () => settings().target === "server";
+  const targetName = () => isServer() ? "the county server" : "GitHub";
+  const configured = () => { const s = settings(); return isServer() ? /^https?:\/\//.test(s.serverUrl) : !!(s.owner && s.repo); };
   function saveSettings(s) { try { localStorage.setItem(SKEY, JSON.stringify(s)); } catch (e) {} }
+  // the GitHub token and the server's publish key are kept apart, so switching back and forth loses neither
+  const tkey = () => isServer() ? TKEY + ".server" : TKEY;
   function getToken() {
-    try { return sessionStorage.getItem(TKEY) || localStorage.getItem(TKEY) || ""; } catch (e) { return ""; }
+    try { return sessionStorage.getItem(tkey()) || localStorage.getItem(tkey()) || ""; } catch (e) { return ""; }
   }
   function setToken(t, remember) {
     try {
-      sessionStorage.removeItem(TKEY); localStorage.removeItem(TKEY);
-      if (t) (remember ? localStorage : sessionStorage).setItem(TKEY, t);
+      sessionStorage.removeItem(tkey()); localStorage.removeItem(tkey());
+      if (t) (remember ? localStorage : sessionStorage).setItem(tkey(), t);
     } catch (e) {}
+  }
+
+  /* ---------- county server (see the top of this file for what it must answer) ---------- */
+  const encPath = p => String(p).split("/").map(encodeURIComponent).join("/");
+  async function sv(path, method, body) {
+    const s = settings(), t = getToken(), headers = {};
+    if (t) headers.Authorization = "Bearer " + t;
+    let res;
+    try { res = await fetch(s.serverUrl.replace(/\/+$/, "") + path, { method: method || "GET", headers, body, cache: "no-store" }); }
+    catch (e) { throw new Error("Couldn't reach the server at " + s.serverUrl + ". Check the address, and that it starts with https://"); }
+    if (!res.ok && res.status !== 404) {
+      let m = ""; try { m = (await res.json()).error || ""; } catch (e) {}
+      const err = new Error(res.status + (m ? " " + m : "")); err.status = res.status; throw err;
+    }
+    return res;
   }
 
   /* ---------- GitHub API ---------- */
@@ -59,6 +99,7 @@
   // The branch tip as of when this editor page opened, so we can tell if someone else changed files since
   let baseSha = null;
   const baseReady = (async () => {
+    if (isServer()) return;
     try { baseSha = (await api("/git/ref/heads/" + await branchName())).object.sha; } catch (e) {}
   })();
 
@@ -86,6 +127,14 @@
   async function publish(files, message, say) {
     say = say || function () {};
     if (!getToken()) throw new Error("No token saved yet. Click the \u2699 button and add one.");
+    if (isServer()) {     // one file at a time; the server keeps the copy it replaces
+      for (let i = 0; i < files.length; i++) {
+        say("Sending " + (i + 1) + " of " + files.length + ": " + files[i].path);
+        const r = await sv("/files/" + encPath(files[i].path), "PUT", files[i].blob);
+        if (!r.ok) throw new Error("The server has no publish address (" + r.status + "). Check the server address in the \u2699 settings.");
+      }
+      return { sha: "", server: true };
+    }
     const branch = await branchName();
     say("Checking the repository\u2026");
     await baseReady;
@@ -205,37 +254,74 @@
   }
 
   function settingsDialog(onSaved) {
-    const s = settings(), hasTok = !!getToken();
+    const s = settings();
+    const canShare = typeof S !== "undefined" && S && typeof touch === "function";
     const ov = overlay(`
-      <h3>GitHub publish settings</h3>
-      <div class="sub">Saved in this browser only. Never put the token in any page's code, because your site is public.</div>
+      <h3>Publish settings</h3>
+      <div class="sub">Where the Publish button sends the map's files. The token or key is saved in this browser only; never put it in any page's code.</div>
+      <label>Publish to</label>
+      <div class="ghp-row" style="gap:16px"><label style="text-transform:none;letter-spacing:0;font-weight:normal;margin:0;display:flex;gap:6px;align-items:center;font-size:14px;color:inherit;white-space:nowrap"><input type="radio" name="ghp-tg" value="github" ${s.target === "server" ? "" : "checked"}> GitHub</label>
+        <label style="text-transform:none;letter-spacing:0;font-weight:normal;margin:0;display:flex;gap:6px;align-items:center;font-size:14px;color:inherit;white-space:nowrap"><input type="radio" name="ghp-tg" value="server" ${s.target === "server" ? "checked" : ""}> A county server</label></div>
+      <div id="ghp-sv">
+        <label>Server address</label><input type="text" id="ghp-u" value="${esc(s.serverUrl)}" placeholder="https://cemeteries.example.gov">
+        <label>Publish key <span id="ghp-skh"></span></label><input type="password" id="ghp-k" autocomplete="off">
+        <div class="sub" style="margin-top:10px">The county's IT staff give you the address and the key. The server keeps a dated copy of every file it replaces.</div>
+      </div>
+      <div id="ghp-gh">
       <div class="ghp-row"><div style="flex:1"><label>Owner</label><input type="text" id="ghp-o" value="${esc(s.owner)}"></div>
         <div style="flex:1"><label>Repository</label><input type="text" id="ghp-r" value="${esc(s.repo)}"></div>
         <div style="flex:1"><label>Branch (blank = default)</label><input type="text" id="ghp-b" value="${esc(s.branch)}"></div></div>
-      <label>Access token ${hasTok ? "(one is saved; leave blank to keep it)" : ""}</label>
+      <label>Access token <span id="ghp-gth"></span></label>
       <input type="password" id="ghp-t" placeholder="github_pat_\u2026" autocomplete="off">
-      <label style="text-transform:none;letter-spacing:0;font-weight:normal;display:flex;gap:6px;align-items:center;margin-top:8px">
-        <input type="checkbox" id="ghp-rem"> Remember on this device (otherwise it is forgotten when you close the tab)</label>
       <div class="sub" style="margin-top:10px">Make a token at github.com \u2192 Settings \u2192 Developer settings \u2192 Fine-grained tokens:
         <ol><li>Repository access: <b>Only select repositories</b> \u2192 the repository that holds this map</li>
         <li>Permissions \u2192 Repository \u2192 <b>Contents: Read and write</b></li>
         <li>Pick an expiry date, create it, copy it here</li></ol></div>
+      </div>
+      <label style="text-transform:none;letter-spacing:0;font-weight:normal;display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input type="checkbox" id="ghp-rem"> Remember the token or key on this device (otherwise it is forgotten when you close the tab)</label>
+      ${canShare ? `<label style="text-transform:none;letter-spacing:0;font-weight:normal;display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input type="checkbox" id="ghp-all"> Make this the destination for everyone who uses this editor (written to settings.json at the next Publish; the token or key is never included)</label>` : ""}
       <div class="ghp-msg" id="ghp-m"></div>
       <div class="ghp-btns">
-        <button id="ghp-forget">Forget token</button><button id="ghp-test">Test</button>
+        <button id="ghp-forget">Forget token or key</button><button id="ghp-test">Test</button>
         <button id="ghp-x">Close</button><button class="go" id="ghp-save">Save</button></div>`);
     const $ = id => ov.querySelector("#" + id), msg = (t, c) => { $("ghp-m").className = "ghp-msg " + (c || ""); $("ghp-m").textContent = t; };
+    const tg = () => ov.querySelector("input[name=ghp-tg]:checked").value;
+    const show = () => {
+      const sv2 = tg() === "server"; $("ghp-sv").hidden = !sv2; $("ghp-gh").hidden = sv2;
+      let has = false; try { const k = sv2 ? TKEY + ".server" : TKEY; has = !!(sessionStorage.getItem(k) || localStorage.getItem(k)); } catch (e) {}
+      $("ghp-skh").textContent = has && sv2 ? "(one is saved; leave blank to keep it)" : "";
+      $("ghp-gth").textContent = has && !sv2 ? "(one is saved; leave blank to keep it)" : "";
+    };
+    ov.querySelectorAll("input[name=ghp-tg]").forEach(r => r.onchange = show); show();
     const store = () => {
-      saveSettings({ owner: $("ghp-o").value.trim(), repo: $("ghp-r").value.trim(), branch: $("ghp-b").value.trim() });
+      const n = { target: tg(), owner: $("ghp-o").value.trim(), repo: $("ghp-r").value.trim(), branch: $("ghp-b").value.trim(), serverUrl: $("ghp-u").value.trim().replace(/\/+$/, "") };
+      saveSettings(n);
       defaultBranchCache = "";
-      const t = $("ghp-t").value.trim();
+      const t = (n.target === "server" ? $("ghp-k") : $("ghp-t")).value.trim();
       if (t) setToken(t, $("ghp-rem").checked);
+      if ($("ghp-all") && $("ghp-all").checked) {
+        S.publish = n.target === "server" ? { target: "server", url: n.serverUrl } : { target: "github", owner: n.owner, repo: n.repo, branch: n.branch };
+        touch("settings");
+      }
+      document.dispatchEvent(new CustomEvent("publish-target", { detail: n.target }));
     };
     $("ghp-x").onclick = () => ov.remove();
-    $("ghp-forget").onclick = () => { setToken("", false); msg("Token removed from this browser.", "ok"); };
+    $("ghp-forget").onclick = () => { saveSettings(Object.assign(settings(), { target: tg() })); setToken("", false); show(); msg("Removed from this browser.", "ok"); };
     $("ghp-save").onclick = () => { store(); ov.remove(); if (onSaved && getToken()) onSaved(); };
     $("ghp-test").onclick = async () => {
       store(); msg("Testing\u2026");
+      if (isServer()) {
+        try {
+          if (!configured()) return msg("Type the server address, starting with https://", "err");
+          const r = await sv("/files");
+          if (!r.ok) return msg("Something answered at that address, but it has no publish address (/files). Ask the county's IT staff to check the server.", "err");
+          const j = await r.json();
+          msg("Connected. This key can publish. The server holds " + (j.files || []).length + " files.", "ok");
+        } catch (e) { msg(/^40[13]/.test(e.message) ? "The server refused that key." : "Could not connect: " + e.message, "err"); }
+        return;
+      }
       try {
         const r = await api("");
         msg(r.permissions && r.permissions.push
@@ -252,12 +338,12 @@
     const rows = initial.map(f => ({ name: f.name, blob: f.blob, path: prefixPath(route(f.name) || defaultRoute(f.name)), on: true }));
     const s = settings();
     const ov = overlay(`
-      <h3>Publish to GitHub</h3>
-      <div class="sub">${esc(s.owner)}/${esc(s.repo)} \u00b7 ${esc(s.branch || "default branch")} \u00b7 one commit for everything below</div>
+      <h3>Publish to ${isServer() ? "the county server" : "GitHub"}</h3>
+      <div class="sub">${isServer() ? esc(s.serverUrl) + " \u00b7 the server keeps a copy of each file it replaces" : esc(s.owner) + "/" + esc(s.repo) + " \u00b7 " + esc(s.branch || "default branch") + " \u00b7 one commit for everything below"}</div>
       ${WS() ? '<div class="ghp-msg" style="color:#d4351c;font-weight:600;margin:0 0 8px">Designing event: ' + esc(WS().slug) + '. These files go into ' + esc(WS().dir) + ' and the live map is not changed.</div>' : ""}
       <div id="ghp-list"></div>
       <div class="ghp-row" style="margin-top:8px"><button id="ghp-add">\uff0b Add files\u2026</button><input type="file" id="ghp-file" multiple hidden></div>
-      <label>Commit message</label><input type="text" id="ghp-msgin">
+      <div ${isServer() ? "hidden" : ""}><label>Commit message</label><input type="text" id="ghp-msgin"></div>
       <div class="ghp-msg" id="ghp-m"></div>
       <div class="ghp-btns"><button id="ghp-cancel">Cancel</button><button class="go" id="ghp-go">Publish</button></div>`);
     const $ = id => ov.querySelector("#" + id), msg = (t, c) => { $("ghp-m").className = "ghp-msg " + (c || ""); $("ghp-m").textContent = t; };
@@ -300,13 +386,13 @@
         const c = await publish(chosen, $("ghp-msgin").value.trim() || "Update from the editor", t => msg(t));
         const s2 = settings();
         $("ghp-m").className = "ghp-msg ok";
-        $("ghp-m").innerHTML = "\u2714 Published " + chosen.length + " file" + (chosen.length === 1 ? "" : "s") +
+        $("ghp-m").innerHTML = "\u2714 Published " + chosen.length + " file" + (chosen.length === 1 ? "" : "s") + (c.server ? ".<br>The map shows the changes right away." :
           '. <a href="https://github.com/' + esc(s2.owner) + "/" + esc(s2.repo) + "/commit/" + c.sha + '" target="_blank" rel="noopener">View commit</a>' +
-          (WS() ? '<br>Saved into the event. The live map is unchanged. <a href="' + esc(new URL(((window.ETS_CONFIG&&window.ETS_CONFIG.LIVE_PAGE)||"Demo2a.html") + "?event=" + WS().slug, location.href).href) + '" target="_blank" rel="noopener">Preview the event</a> (it can take a minute to appear).' : "<br>The live site updates in about a minute.");
+          (WS() ? '<br>Saved into the event. The live map is unchanged. <a href="' + esc(new URL(((window.ETS_CONFIG&&window.ETS_CONFIG.LIVE_PAGE)||"Demo2a.html") + "?event=" + WS().slug, location.href).href) + '" target="_blank" rel="noopener">Preview the event</a> (it can take a minute to appear).' : "<br>The live site updates in about a minute."));
         $("ghp-cancel").textContent = "Close"; $("ghp-cancel").disabled = false;
         if (opts.onPublished) { try { opts.onPublished(chosen); } catch (e) {} }
       } catch (e) {
-        msg(/^Cancelled/.test(e.message) ? e.message : /401|403/.test(e.message) ? "GitHub refused the token (" + e.message + "). Check the \u2699 settings." : "Failed: " + e.message, "err");
+        msg(/^Cancelled/.test(e.message) ? e.message : /401|403/.test(e.message) ? (isServer() ? "The server refused the publish key (" : "GitHub refused the token (") + e.message + "). Check the \u2699 settings." : "Failed: " + e.message, "err");
         $("ghp-go").disabled = false; $("ghp-cancel").disabled = false; $("ghp-add").disabled = false;
       }
     };
@@ -324,33 +410,35 @@
     btn.className = anchor ? anchor.className.replace(/\bprimary\b/, "").trim() : "";
     btn.style.cssText = "background:#238636;border-color:#238636;color:#fff;margin-left:6px;cursor:pointer";
     const gear = document.createElement("button");
-    gear.type = "button"; gear.textContent = "\u2699"; gear.title = "GitHub publish settings";
+    gear.type = "button"; gear.textContent = "\u2699"; gear.title = "Publish settings";
     gear.className = btn.className; gear.style.cssText = "margin-left:4px;cursor:pointer";
     if (anchor) { anchor.after(btn); btn.after(gear); }
     else (document.getElementById(opts.into) || document.body).append(btn, gear);
 
     gear.onclick = () => settingsDialog();
     btn.onclick = async () => {
-      if (!getToken() || !settings().owner || !settings().repo) { settingsDialog(() => btn.click()); return; }
+      if (!getToken() || !configured()) { settingsDialog(() => btn.click()); return; }
       btn.disabled = true;
       try {
         if (opts.prepare) {   // e.g. merge other people's changes first
           try { await opts.prepare(); }
-          catch (e) { alert("Couldn't check GitHub for newer changes, so nothing was published.\n\n" + e.message); return; }
+          catch (e) { alert("Couldn't check " + targetName() + " for newer changes, so nothing was published.\n\n" + e.message); return; }
         }
         reviewDialog(ids.length ? await capture(ids) : [], opts);
       } finally { btn.disabled = false; }
     };
   }
 
-  async function listFiles() {              // every file path in the repo (used by "Make missing thumbnails")
+  async function listFiles() {              // every file path at the publish destination
+    if (isServer()) { const r = await sv("/files"); if (!r.ok) throw new Error("The server has no file list (/files)."); return (await r.json()).files || []; }
     const head = (await api("/git/ref/heads/" + await branchName())).object.sha;
     const base = (await api("/git/commits/" + head)).tree.sha;
     return (await api("/git/trees/" + base + "?recursive=1")).tree.filter(x => x.type === "blob").map(x => x.path);
   }
 
-  async function rebase() { baseSha = (await api("/git/ref/heads/" + await branchName())).object.sha; return baseSha; }
-  async function readText(path, ref) {   // latest text of one repo file, or null if it doesn't exist
+  async function rebase() { if (isServer()) return ""; baseSha = (await api("/git/ref/heads/" + await branchName())).object.sha; return baseSha; }
+  async function readText(path, ref) {   // latest text of one published file, or null if it doesn't exist
+    if (isServer()) { const r = await sv("/files/" + encPath(path)); return r.ok ? r.text() : null; }
     const s = settings(), res = await fetch("https://api.github.com/repos/" + s.owner + "/" + s.repo + "/contents/" +
       path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(ref || await branchName()),
       { cache: "no-store", headers: { Accept: "application/vnd.github.raw+json", Authorization: "Bearer " + getToken() } });
@@ -359,5 +447,14 @@
     return res.text();
   }
 
-  window.GHPublish = { attach, publish, settingsDialog, listFiles, settings, rebase, read: readText };
+  async function readBlob(path) {        // one published file as it is (photos too), or null
+    if (isServer()) { const r = await sv("/files/" + encPath(path)); return r.ok ? r.blob() : null; }
+    const s = settings(), res = await fetch("https://api.github.com/repos/" + s.owner + "/" + s.repo + "/contents/" + encPath(path) + "?ref=" + encodeURIComponent(await branchName()),
+      { cache: "no-store", headers: { Accept: "application/vnd.github.raw+json", Authorization: "Bearer " + getToken() } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("GitHub answered " + res.status);
+    return res.blob();
+  }
+
+  window.GHPublish = { attach, publish, settingsDialog, listFiles, settings, rebase, read: readText, readBlob, isServer, configured, hasKey: () => !!getToken(), targetName };
 })();

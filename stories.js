@@ -197,7 +197,7 @@
       const who = [s.TOLD_BY, s.CONNECTION].filter(x => String(x || "").trim()).join(", ");
       h += '<div class="st-item">' + (s.PERSON && t.type === "marker" ? '<div class="st-meta"><b>About ' + H(s.PERSON) + "</b></div>" : "") +
         "<p>" + H(s.TEXT) + "</p>" +
-        (s.PHOTO ? '<img src="' + H(s.PHOTO) + '" alt="Photo shared with this story" loading="lazy">' : "") +
+        (s.PHOTO ? '<img src="' + H(typeof photoUrl === "function" ? photoUrl(s.PHOTO) : s.PHOTO) + '" alt="Photo shared with this story" loading="lazy">' : "") +
         '<div class="st-meta">' + (who ? "Shared by " + H(who) : "Shared anonymously") + (s.DATE_TOLD ? " · " + H(s.DATE_TOLD) : "") +
         (s.TAG ? '<span class="st-tag">' + H(s.TAG) + "</span>" : "") + (s.SOURCE ? "<br>Source: " + H(s.SOURCE) : "") + "</div></div>";
     });

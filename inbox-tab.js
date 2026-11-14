@@ -30,6 +30,7 @@
   const VISIT_COLS = ["VISIT_ID", "DATE", "CEMETERY_ID", "TARGET_TYPE", "TARGET_ID", "SURVEYOR", "SUMMARY", "DATA"];
 
   let items = [], current = null, filter = "all", lastCheck = null, invites = null, lastError = "";
+  let me = null, leads = null, newLead = null;   // me: { role: "owner" | "lead", name }
   const queuedApprove = new Set();            // inbox ids to mark approved after the next Save / Publish
   const mediaUrls = new Map();                // media id -> object URL (for showing photos)
 
@@ -99,6 +100,7 @@
       if (!j.ok) throw new Error(j.error || "The inbox didn't answer.");
       const local = items.filter(i => i.local);
       items = j.items.filter(i => !queuedApprove.has(i.id)).map(i => Object.assign(i, { local: false })).concat(local);
+      if (!me) { try { const w = await (await call("/whoami")).json(); if (w.ok) me = { role: w.role, name: w.name }; } catch (e) {} }
       lastCheck = new Date(); lastError = ""; if (current && !items.includes(current)) current = items.find(i => i.id === current.id) || null;
       badge(); if (!quiet) say(items.length ? items.length + " new addition" + (items.length === 1 ? "" : "s") + " waiting." : "Nothing new in the inbox.");
     } catch (e) { lastError = (e && e.message === "Failed to fetch") ? "Couldn't reach the inbox at " + inbox() + ". Check the \"inbox\" address in settings.json and your internet connection." : String(e && e.message || e); if (!quiet) say(lastError); }
@@ -240,8 +242,10 @@
     pane.append(list);
     if (current) detail(current);
     surveyorsBox();
+    if (me && me.role === "owner") leadsBox();
     importRow();
-    pane.append(el("div", { className: "row" }, [el("button", { textContent: "Forget Lead Key", onclick: () => { if (confirm("Remove the lead key from this browser?")) { setKey(""); items = items.filter(i => i.local); current = null; badge(); draw(); } } })]));
+    if (me) pane.append(el("small", { textContent: me.role === "owner" ? "Signed in as a manager." : "Signed in as " + me.name + " (lead)." }));
+    pane.append(el("div", { className: "row" }, [el("button", { textContent: "Forget Lead Key", onclick: () => { if (confirm("Remove the lead key from this browser?")) { setKey(""); me = null; leads = null; newLead = null; items = items.filter(i => i.local); current = null; badge(); draw(); } } })]));
   }
 
   function answersHtml(it) {
@@ -332,7 +336,7 @@
       if (k === "story") {
         if (!(await loadExtra("stories"))) return;
         let photoPath = "";
-        if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photoPath = "photos/stories/" + it.id + ".jpg"; photos.set(photoPath, b); touch("photos"); } }
+        if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photoPath = photoDir("stories") + it.id + ".jpg"; photos.set(photoPath, b); touch("photos"); } }
         extra.stories.rows.push({ _new: true, STORY_ID: it.id, TARGET_TYPE: it.target_type || "marker", TARGET_ID: it.target_id || "", CEMETERY_ID: d.cemetery || "", PERSON: d.person || "",
           TEXT: storyEdit.t.value.trim(), QUOTE: storyEdit.q.value.trim(), TOLD_BY: storyEdit.who.value.trim(), CONNECTION: storyEdit.conn.value.trim(),
           DATE_TOLD: String(it.received || it.created || "").slice(0, 10), TAG: storyEdit.tag.value, SOURCE: storyEdit.src.value.trim(), PHOTO: photoPath });
@@ -354,7 +358,7 @@
           }
           if (on("pics") && kept.length) {
             let n = 0; const taken = p => photos.has(p);
-            for (const p of kept) { const b = await mediaBlob(it, p.ref); if (!b) continue; let path; do { path = "photos/" + c.ID + (n ? "-" + (n + 1) : "") + ".jpg"; n++; } while (taken(path)); photos.set(path, b); }
+            for (const p of kept) { const b = await mediaBlob(it, p.ref); if (!b) continue; let path; do { path = photoDir("cemeteries") + c.ID + (n ? "-" + (n + 1) : "") + ".jpg"; n++; } while (taken(path)); photos.set(path, b); }
             touch("photos");
           }
         }
@@ -363,7 +367,7 @@
             const stone = ints.find(x => x.CEMETERY_ID === c.ID && x.MARKER_ID === it.target_id);
             if (stone && on("move") && d._moved) { const p = fix(d._moved.to); moveStone(stone, p[1], p[0]); touch("ints"); }
             if (stone && on("vet")) { sameStone(stone).forEach(x => x.VETERAN = "1"); touch("ints"); }
-            if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set("photos/gravepics/" + it.target_id + "-1.jpg", b); touch("photos"); } }
+            if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set(photoDir("graves") + it.target_id + "-1.jpg", b); touch("photos"); } }
           } else if (on("add")) {
             const p = fix(whereOf(it)), digits = (c.ID.replace(/\D/g, "") || "0").slice(-3).padStart(3, "0");
             let n = ints.filter(x => x.CEMETERY_ID === c.ID).length + 1, id;
@@ -379,7 +383,7 @@
               ints.push(row);
             });
             touch("ints");
-            if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set("photos/gravepics/" + id + "-1.jpg", b); touch("photos"); } }
+            if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set(photoDir("graves") + id + "-1.jpg", b); touch("photos"); } }
             d._newMarker = id;
           }
         }
@@ -439,6 +443,36 @@
         try { await call("/invites/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: v.code }) }); v.revoked = 1; showInvites(list); } catch (e) { say(e.message); } } })
     ])));
   }
+
+  /* ---------- leads (managers only): each lead has their own key, so one can be removed without touching the others ---------- */
+  function leadsBox() {
+    const box = el("div", { className: "box" }, [el("b", { textContent: "Leads" })]);
+    const name = el("input", { placeholder: "Name of the new lead" }), list = el("div");
+    box.append(el("small", { textContent: "Leads can review, approve and invite surveyors. Each gets their own key. Only managers can add or remove leads." }), name,
+      el("div", { className: "row" }, [el("button", { className: "go", textContent: "Add Lead", onclick: async () => {
+        if (!name.value.trim()) return say("Type the lead's name first.");
+        try { const j = await (await call("/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.value.trim() }) })).json(); if (!j.ok) throw new Error(j.error);
+          newLead = { name: j.name, key: j.key }; leads = null; await loadLeads(); draw();
+        } catch (e) { say(e.message); } } }), el("button", { textContent: "Show Leads", onclick: async () => { await loadLeads(); draw(); } })]));
+    if (newLead) {
+      const inp = el("input", { value: newLead.key, readOnly: true, style: "font-family:monospace" });
+      box.append(el("div", { className: "box", style: "background:#fff7d6;border-color:#C9A227" }, [
+        el("b", { textContent: newLead.name + "'s lead key" }),
+        el("small", { textContent: "Give this to " + newLead.name + " in person or by phone. It is shown only this once; if it's lost, remove them and add them again." }), inp,
+        el("div", { className: "row" }, [el("button", { textContent: "Copy Key", onclick: () => { inp.select(); navigator.clipboard ? navigator.clipboard.writeText(newLead.key).then(() => say("Copied.")) : document.execCommand("copy"); } }),
+          el("button", { textContent: "Done", onclick: () => { newLead = null; draw(); } })])]));
+    }
+    if (leads) {
+      if (!leads.length) list.append(el("small", { textContent: "No leads yet. Only managers have access." }));
+      leads.forEach(v => list.append(el("div", { className: "row", style: "font-size:12px" }, [
+        el("span", { textContent: v.name + (v.revoked ? " (removed)" : "") + " · added " + String(v.created).slice(0, 10), style: "flex:1;" + (v.revoked ? "color:#999;text-decoration:line-through" : "") }),
+        v.revoked ? el("span") : el("button", { className: "bad", textContent: "Remove", onclick: async () => {
+          if (!confirm("Remove " + v.name + " as a lead? Their key stops working right away. Other leads are not affected.")) return;
+          try { await call("/leads/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: v.id }) }); v.revoked = 1; draw(); } catch (e) { say(e.message); } } })])));
+    }
+    box.append(list); pane.append(box);
+  }
+  async function loadLeads() { try { const j = await (await call("/leads")).json(); if (!j.ok) throw new Error(j.error); leads = j.leads; } catch (e) { say(e.message); } }
 
   /* ---------- the safety net: a file saved by a surveyor's phone ---------- */
   function importRow() {

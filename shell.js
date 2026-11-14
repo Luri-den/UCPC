@@ -36,12 +36,12 @@
   const gear = publish && publish.nextElementSibling && publish.nextElementSibling.tagName === "BUTTON" ? publish.nextElementSibling : null;
   const fileBtn = mk("button", { type: "button", textContent: "File ▾" });
   const fileMenu = mk("div", { className: "ed-menu" });
-  [["open", "Open My Map Files", "Pick the map folder on this computer"], ["gopen", "Open From GitHub", "Load the published map"], ["new", "New County", "Start an empty map"], ["save", "Save to Folder", "Write changes to the open folder"], ["dlBtn", "Download", ""]].forEach(([id, label, sub]) => {
+  [["open", "Open My Map Files", "Pick the map folder on this computer"], ["gopen", "Open Published Map", "Load the map as it is published now"], ["new", "New County", "Start an empty map"], ["save", "Save to Folder", "Write changes to the open folder"], ["dlBtn", "Download", ""]].forEach(([id, label, sub]) => {
     const b = document.getElementById(id); if (!b) return;
     b.removeAttribute("style"); b.className = ""; b.textContent = label; if (sub) b.append(mk("small", { textContent: sub })); fileMenu.append(b);
   });
-  if (publish) { publish.classList.add("ed-publish"); publish.textContent = "Publish"; publish.title = "Publish to GitHub"; actions.append(publish); }
-  if (gear) { gear.classList.add("ed-gear"); gear.setAttribute("aria-label", "GitHub publish settings"); actions.append(gear); }
+  if (publish) { publish.classList.add("ed-publish"); publish.textContent = "Publish"; publish.title = "Publish"; actions.append(publish); }
+  if (gear) { gear.classList.add("ed-gear"); gear.setAttribute("aria-label", "Publish settings"); actions.append(gear); }
   actions.append(fileBtn, fileMenu); menu(fileBtn, fileMenu);
   top.prepend(brand, actions);
   if (msg) actions.after(msg);

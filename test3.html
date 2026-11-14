@@ -1040,6 +1040,17 @@ const SET_COLORS = Object.assign({ accent: "#01796F", public: "#01796F", permiss
     inaccessible: "#8B0000", unknown: "#777777", boundary: "#01796F", county: "#555555", grave: "#3f3528" }, SET.colors || {});
 const SET_FILES = Object.assign({ cemeteries: "cemlist.csv", interments: "interments.csv",
     boundaries: "test-cemetery.geojson", county: "franklin-county.geojson" }, SET.files || {});
+// Where pictures live (settings.json "paths"); the defaults are the folders this map has always used
+const SET_PATHS = (function () {
+    const d = { cemeteries: "photos/", graves: "photos/gravepics/", stories: "photos/stories/", base: "" }, p = SET.paths || {}, o = {};
+    ["cemeteries", "graves", "stories"].forEach(function (k) {
+        const v = String(p[k] || d[k]).trim().replace(/^\/+/, "").replace(/\/+$/, "");
+        o[k] = v && v.split("/").indexOf("..") < 0 ? v + "/" : d[k];
+    });
+    o.base = String(p.base || "").trim().replace(/\/+$/, ""); if (o.base) { o.base += "/"; }
+    return o;
+})();
+function photoUrl(path) { return !SET_PATHS.base || /^(https?:|blob:|data:)/.test(path) ? path : SET_PATHS.base + path; }
 const MAP_BOUNDS = SET.maxBounds || [[-85.50, 39.10], [-84.65, 39.70]];
 
 (function applySettingsToPage() {
@@ -1413,9 +1424,9 @@ function gravePhotoPath(markerID) {
     }
 
     return (
-        "photos/gravepics/" +
+        photoUrl(SET_PATHS.graves +
         encodeURIComponent(markerID) +
-        "-1.jpg"
+        "-1.jpg")
     );
 }
 
@@ -3554,7 +3565,7 @@ function showCemeteryPanel(feature) {
         <p class="cem-row3"><b>Established:</b> ${establishedText}</p>
 
        <img
-    src="photos/${encodeURIComponent(props.Cemetery_ID)}.jpg"
+    src="${photoUrl(SET_PATHS.cemeteries + encodeURIComponent(props.Cemetery_ID) + ".jpg")}"
     alt="${escapeHtml(props.Cemetery_Name || "Cemetery")}"
     class="cemetery-popup-photo"
     data-cemetery-photo-id="${escapeHtml(props.Cemetery_ID)}"
@@ -6012,7 +6023,7 @@ gravePhotoLightbox.addEventListener(
         index;
 
     image.src =
-        `photos/${encodeURIComponent(cemeteryID)}.${extensions[index]}`;
+        photoUrl(`${SET_PATHS.cemeteries}${encodeURIComponent(cemeteryID)}.${extensions[index]}`);
 };
    
 

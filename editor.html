@@ -142,6 +142,10 @@ const dirty = new Set();
 let guide = null;   // the visitor guide (motifs.json)
 let hadSettings = false;   // true when a settings.json was found on open
 const photos = new Map();   // pending photos: path in the repository -> image Blob
+// Where pictures live. settings.json "paths" can move them; the defaults are the folders this map has always used.
+const PATHS_DEF = { cemeteries:"photos/", graves:"photos/gravepics/", stories:"photos/stories/", base:"" };
+function photoDir(k) { const v = String((S && S.paths && S.paths[k]) || PATHS_DEF[k]).trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, ""); return v && !v.split("/").includes("..") ? v + "/" : PATHS_DEF[k]; }
+function photoUrl(path) { const b = String((S && S.paths && S.paths.base) || "").trim(); return !b || /^(https?:|blob:|data:)/.test(path) ? path : b.replace(/\/+$/, "") + "/" + path; }
 function blank() {
   S = { name:"", shortName:"", idPrefix:"FC", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
   cems = []; cemF = CEM_DEF.slice(); ints = []; intF = INT_DEF.slice();
@@ -443,7 +447,7 @@ async function shrink(file, max = 1600) {
 function photoBox(box, path, label) {
   const b = el("div", { className:"box" }, [el("b", { textContent:label })]), exts = ["jpg", "jpeg", "png", "webp", "gif"];
   const img = el("img", { style:"max-width:100%;max-height:160px;display:block;margin:6px 0" }); let k = 0;
-  const show = () => { img.hidden = false; img.src = photos.has(path) ? URL.createObjectURL(photos.get(path)) : path.replace(/\.jpg$/, "." + exts[k]); };
+  const show = () => { img.hidden = false; img.src = photos.has(path) ? URL.createObjectURL(photos.get(path)) : photoUrl(path.replace(/\.jpg$/, "." + exts[k])); };
   img.onerror = () => { if (!photos.has(path) && ++k < exts.length) show(); else img.hidden = true; };
   show();
   const f = el("input", { type:"file", accept:"image/*", hidden:true, onchange:async e => {
@@ -480,7 +484,7 @@ function drawCem() {
   hazardBox(box, r);
   fenceBox(box, r);
   [["", "Entrance photo (shown first)"], ["-2", "Photo 2"], ["-3", "Photo 3"]].forEach(([sfx, label], i) => {
-    photoBox(box, "photos/" + r.ID + sfx + ".jpg", label);
+    photoBox(box, photoDir("cemeteries") + r.ID + sfx + ".jpg", label);
     form(box.lastChild, r, [["PHOTO" + (i + 1) + "_CAPTION", "Caption (optional)"]], "cem", cemF);
   });
 
@@ -538,7 +542,7 @@ function drawGrv() {
     coordBox(box, selG, "ints"); form(box, selG, GRF, "ints", intF); flags(box, selG);
     if (selG.MARKER_ID) box.append(el("button", { className:"go", textContent:"+ Add Another Person to This Stone", onclick:() => addPerson(selG) }),
       el("div", {}, [el("small", { textContent:"Stone " + selG.MARKER_ID + ": " + sameStone(selG).length + " person(s). Moving the pin moves everyone on it." })]));
-    if (selG.MARKER_ID) photoBox(box, "photos/gravepics/" + selG.MARKER_ID + "-1.jpg", "Grave photo");
+    if (selG.MARKER_ID) photoBox(box, photoDir("graves") + selG.MARKER_ID + "-1.jpg", "Grave photo");
     else box.append(el("small", { textContent:"This grave has no Marker ID, so it can't have a photo yet." }));
     box.append(el("p", {}, [el("button", { className:"bad", textContent:"Delete This Grave", onclick:() => {
       if (!confirm("Delete this grave record?")) return; ints = ints.filter(x => x !== selG); selG = null; touch("ints"); refresh(); } })]));
@@ -822,7 +826,7 @@ function renumberCem(m) {
   ints.forEach(r => { if (r.CEMETERY_ID === old) r.CEMETERY_ID = m.ID; });
   bounds.features.forEach(f => { if ((f.properties || {}).CEMETERY_ID === old) f.properties.CEMETERY_ID = m.ID; });
   [...photos.keys()].forEach(k => {
-    const x = k.replace("photos/" + old + ".", "photos/" + m.ID + ".").replace("photos/" + old + "-", "photos/" + m.ID + "-");
+    const pd = photoDir("cemeteries"), x = k.replace(pd + old + ".", pd + m.ID + ".").replace(pd + old + "-", pd + m.ID + "-");
     if (x !== k) { photos.set(x, photos.get(k)); photos.delete(k); }
   });
   if (sel === old) sel = m.ID;
@@ -835,8 +839,8 @@ function renumberStone(cid, old, movers) {
     r.PERSON_ID = String(r.PERSON_ID || "").startsWith(old) ? id + r.PERSON_ID.slice(old.length) : id;
     r.MARKER_ID = id; if (!ints.includes(r)) ints.push(r);
   });
-  const k = "photos/gravepics/" + old + "-1.jpg";
-  if (photos.has(k)) { photos.set("photos/gravepics/" + id + "-1.jpg", photos.get(k)); photos.delete(k); }
+  const k = photoDir("graves") + old + "-1.jpg";
+  if (photos.has(k)) { photos.set(photoDir("graves") + id + "-1.jpg", photos.get(k)); photos.delete(k); }
 }
 async function syncFromGitHub() {
   const head = await GHPublish.rebase();
@@ -872,7 +876,7 @@ async function syncFromGitHub() {
   }
   if (sel && !cems.some(r => r.ID === sel)) sel = null;
   if (selG && !ints.includes(selG)) selG = null;
-  refresh(); say("Checked GitHub and merged other people's changes with yours.");
+  refresh(); say("Checked the published map and merged other people's changes with yours.");
 }
 
 // Cemeteries with no ID can't be edited or merged, so they get one when the files are opened
@@ -908,7 +912,7 @@ $("#save").onclick = async () => {
     if (!dir && window.showDirectoryPicker && confirm("Choose the folder to save into (your map folder).")) dir = await showDirectoryPicker({ mode:"readwrite" });
     for (const [n, t] of outFiles()) await put(n, t);
     clean();
-    say(dir ? "Saved into your folder." : "Saved. Your browser put the files in Downloads: copy them into your map folder (photos go in the photos folder, grave photos in photos/gravepics).");
+    say(dir ? "Saved into your folder." : "Saved. Your browser put the files in Downloads: copy them into your map folder (cemetery photos go in " + photoDir("cemeteries") + ", grave photos in " + photoDir("graves") + ").");
   } catch (e) { if (e.name !== "AbortError") say("Save failed: " + e.message); }
 };
 // Hidden button: the GitHub publisher "presses" it to collect the files (see publish.js)
@@ -930,12 +934,12 @@ async function loadFromSite() {   // when this page is served from a website
 async function loadFromGitHub() {   // works from a file on your computer, and with private repositories
   if (!window.GHPublish) return say("publish.js is missing. Put it in the same folder as editor.html.");
   try {
-    say("Reading from GitHub…");
+    say("Reading the published map…");
     const head = await GHPublish.rebase();
     const files = await filesFrom(async n => { const t = await GHPublish.read(n, head); return t == null ? null : new File([t], n); });
-    if (files.length < 2) return say("I couldn't find the map files in that repository. Check the repository name, branch and token in the ⚙ settings next to Publish.");
+    if (files.length < 2) return say("I couldn't find the map files there. Check the publish destination in the ⚙ settings next to Publish.");
     dir = null; await load(files);
-  } catch (e) { say("Couldn't read from GitHub: " + e.message + " Check the ⚙ settings next to Publish."); }
+  } catch (e) { say("Couldn't read the published map: " + e.message + " Check the ⚙ settings next to Publish."); }
 }
 $("#gopen").onclick = loadFromGitHub;
 loadFromSite();
@@ -943,7 +947,8 @@ loadFromSite();
 <script src="inbox-tab.js"></script>
 <script src="questions-tab.js"></script>
 <script src="publish.js"></script>
-<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
+<script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say(GHPublish.isServer() ? "Published." : "Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 <script src="shell.js"></script>
+<script src="export-tools.js"></script>
 </body>
 </html>
