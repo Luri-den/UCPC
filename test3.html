@@ -3269,6 +3269,7 @@ function handleGraveClick(event) {
     if (person.pioneer) { briefParts.push("Pioneer"); }
     if (person.sex && person.sex !== "U") { briefParts.push(person.sex); }
 
+    infoContent.dataset.storyFor = JSON.stringify({ type: "marker", id: person.markerID || "", cemetery: props.Cemetery_ID || "", person: person.name || "", label: (person.name || "This grave") + (cemeteryName ? ", " + cemeteryName : "") });   // stories.js adds Stories and memories
     infoContent.innerHTML = `
         <div class="grave-info-with-photo">
             <div class="grave-info-details">
@@ -3352,6 +3353,7 @@ function showSharedMarkerPanel(cemeteryID, markerID, viewAll) {
         });
 
 
+        infoContent.dataset.storyFor = JSON.stringify({ type: "marker", id: markerID, cemetery: cemeteryID, label: "Shared marker, " + (cemeteryName || "") });   // stories.js
         infoContent.innerHTML = html;
         return;
     }
@@ -3369,6 +3371,7 @@ function showSharedMarkerPanel(cemeteryID, markerID, viewAll) {
             >${escapeHtml(person.name || "Unnamed Interment")}</button>`;
     });
 
+    infoContent.dataset.storyFor = JSON.stringify({ type: "marker", id: markerID, cemetery: cemeteryID, label: "Shared marker, " + (cemeteryName || "") });   // stories.js
     infoContent.innerHTML = `
         <h2>Shared Marker</h2>
         <p>This physical marker represents <strong>${group.length}</strong> people.</p>
@@ -3540,6 +3543,7 @@ function showCemeteryPanel(feature) {
     const pioneersText = Number(props.Pioneers) === 1 ? "Yes" : (Number(props.Pioneers) === 0 ? "No" : "Unknown");
     const hasHazards = props.Hazards === true || props.Hazards === "true";
 
+    infoContent.dataset.storyFor = JSON.stringify({ type: "cemetery", id: props.Cemetery_ID || "", label: props.Cemetery_Name || props.Cemetery_ID || "" });   // stories.js
     infoContent.innerHTML = `
         <div class="cem-row1">
             <h2>${escapeHtml(props.Cemetery_Name || "Unknown Site")}</h2>
@@ -6059,5 +6063,6 @@ gravePhotoLightbox.addEventListener(
     });
 })();
 </script>
+<script src="stories.js"></script>
 </body>
 </html>
