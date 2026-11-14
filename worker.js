@@ -32,6 +32,8 @@ const MAX_BODY = 8 * 1024 * 1024;      // 8 MB per submission
 const MAX_MEDIA = 6;                   // photos/recordings per submission
 const MAX_MEDIA_CHARS = 1900000;       // ~1.4 MB per file once decoded (D1 rows top out at 2 MB)
 const ALLOWED_MIME = /^(image\/(jpeg|png|webp)|audio\/(webm|mp4|mpeg|ogg|aac|x-m4a))$/;
+const PUBLIC_PER_HOUR = 30;            // public stories accepted per county per hour
+const PUBLIC_WAITING = 150;            // public stories that may wait unreviewed per county; clear the Review tab to make room
 const STATUSES = ["new", "approved", "rejected", "held"];
 
 const CORS = {
@@ -169,6 +171,11 @@ export default {
         if (!(await turnstileOk(env, body.turnstile, req.headers.get("CF-Connecting-IP")))) return fail(403, "The spam check didn't pass. Please try again.");
         if (!body.data || !String(body.data.text || "").trim()) return fail(400, "Please write the story or memory first.");
         if (!body.data.consent) return fail(400, "Please confirm you have permission to share this.");
+        // Anyone can reach this address, so it is capped: a flood can't fill the database and block the surveyors
+        if (Array.isArray(body.media) && body.media.length > 2) return fail(400, "A story can carry one photo and one recording.");
+        const hourAgo = new Date(Date.now() - 3600000).toISOString();
+        const load = await env.DB.prepare("SELECT SUM(CASE WHEN received > ? THEN 1 ELSE 0 END) AS recent, SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) AS waiting FROM submissions WHERE area = ? AND channel = 'public'").bind(hourAgo, area).first();
+        if (load && ((load.recent || 0) >= PUBLIC_PER_HOUR || (load.waiting || 0) >= PUBLIC_WAITING)) return fail(429, "The inbox is very busy right now. Please try again later.");
         body.kind = "story";
         const res = await store(env, area, "public", body, null);
         if (!res.duplicate) later(notify(env, area, res.id));

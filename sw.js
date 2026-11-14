@@ -18,7 +18,8 @@ const LIB_HOSTS = ["unpkg.com", "cdn.jsdelivr.net"];
 const isTile = u => /\/\d+\/\d+\/\d+(\.[a-z0-9]+)?$/i.test(u.pathname) || /bbox=/i.test(u.search) || /\/tile\//i.test(u.pathname);
 const keyFor = u => u.origin + u.pathname;                    // same-origin copies ignore ?invite=… and similar
 
-async function keep(cacheName, key, res) { try { if (res && res.ok && res.status === 200 && res.type !== "opaque") await (await caches.open(cacheName)).put(key, res.clone()); } catch (e) {} return res; }
+const MAX_KEEP = 6 * 1048576;      // bigger files (the scanned old maps) are not kept: they would crowd out everything else
+async function keep(cacheName, key, res) { try { if (res && res.ok && res.status === 200 && res.type !== "opaque" && !(+res.headers.get("content-length") > MAX_KEEP)) await (await caches.open(cacheName)).put(key, res.clone()); } catch (e) {} return res; }
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {

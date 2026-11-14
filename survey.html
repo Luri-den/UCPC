@@ -687,6 +687,8 @@ async function exportUnsent() {
 boot();
 </script>
 <script>
+// Ask the phone not to clear saved surveys when it runs low on space
+if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
 // Offline: sw.js keeps a copy of this page and its data so it opens with no signal
 if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
 </script>
