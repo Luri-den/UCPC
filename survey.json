@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "note": "Survey questions. for: cemetery or marker. level: core (always shown) or expanded (under Add more detail). showIf: only ask when another answer matches. saveTo: the CSV column an approved answer updates (blank = kept in the visit record only). Never change an id once surveys use it. Fence and hazard choices match the editor's lists; the extra ones at the end are kept in the visit record.",
+  "hazardTypes": [
+    "Unstable / Uneven Ground",
+    "Steep Slope(s)",
+    "Heavy Brush / Roots",
+    "Livestock / Animals",
+    "Poison Ivy / Oak",
+    "Fallen / Broken Stones",
+    "Open / Damaged Vault",
+    "Frequent Flooding / Mud",
+    "Holes / Sinking Ground",
+    "Insects / Wasps",
+    "Other"
+  ],
+  "questions": [
+    {
+      "id": "first_visit",
+      "for": "cemetery",
+      "level": "core",
+      "type": "yesno",
+      "label": "Is this the first survey of this cemetery?"
+    },
+    {
+      "id": "overall_condition",
+      "for": "cemetery",
+      "level": "core",
+      "type": "choice",
+      "label": "Overall condition",
+      "options": [
+        "Well kept",
+        "Fair",
+        "Poor",
+        "Overgrown",
+        "Hard to find / lost"
+      ]
+    },
+    {
+      "id": "entrance_safe",
+      "for": "cemetery",
+      "level": "core",
+      "type": "yesno",
+      "label": "Do you feel safe getting a GPS reading and photo of the entrance?"
+    },
+    {
+      "id": "entrance_point",
+      "for": "cemetery",
+      "level": "core",
+      "type": "gps",
+      "label": "Entrance location",
+      "help": "Stand at the main entrance and tap Use my location.",
+      "showIf": {
+        "q": "entrance_safe",
+        "is": "Yes"
+      }
+    },
+    {
+      "id": "entrance_photo",
+      "for": "cemetery",
+      "level": "core",
+      "type": "photo",
+      "label": "Photo of the entrance",
+      "max": 2,
+      "showIf": {
+        "q": "entrance_safe",
+        "is": "Yes"
+      }
+    },
+    {
+      "id": "boundary_safe",
+      "for": "cemetery",
+      "level": "core",
+      "type": "yesno",
+      "label": "Do you feel safe marking the cemetery boundary?"
+    },
+    {
+      "id": "boundary",
+      "for": "cemetery",
+      "level": "core",
+      "type": "polygon",
+      "label": "Cemetery boundary",
+      "help": "Walk to each corner and tap Add corner here, or draw the corners on the aerial map.",
+      "showIf": {
+        "q": "boundary_safe",
+        "is": "Yes"
+      }
+    },
+    {
+      "id": "fence",
+      "for": "cemetery",
+      "level": "core",
+      "type": "yesno",
+      "label": "Is there a fence?",
+      "saveTo": "FENCE"
+    },
+    {
+      "id": "fence_types",
+      "for": "cemetery",
+      "level": "core",
+      "type": "multi",
+      "label": "Fence types (pick all that apply)",
+      "options": [
+        "Stone",
+        "Wire",
+        "Cast Iron",
+        "Aluminum / Vinyl",
+        "Pipe",
+        "Chain Link",
+        "Wood",
+        "Hedge",
+        "Other"
+      ],
+      "showIf": {
+        "q": "fence",
+        "is": "Yes"
+      },
+      "saveTo": "FENCE_TYPES"
+    },
+    {
+      "id": "hazards",
+      "for": "cemetery",
+      "level": "core",
+      "type": "yesno",
+      "label": "Are there noticeable hazards?",
+      "saveTo": "HAZARDS"
+    },
+    {
+      "id": "hazard_types",
+      "for": "cemetery",
+      "level": "core",
+      "type": "multi",
+      "label": "What kinds of hazards?",
+      "optionsFrom": "hazardTypes",
+      "showIf": {
+        "q": "hazards",
+        "is": "Yes"
+      },
+      "saveTo": "HAZARD_DETAILS"
+    },
+    {
+      "id": "hazard_spots",
+      "for": "cemetery",
+      "level": "core",
+      "type": "points",
+      "label": "Mark hazard spots (optional)",
+      "help": "If you can't get close, mark it from where you are and say so in the note.",
+      "optionsFrom": "hazardTypes",
+      "showIf": {
+        "q": "hazards",
+        "is": "Yes"
+      }
+    },
+    {
+      "id": "cem_photos",
+      "for": "cemetery",
+      "level": "core",
+      "type": "photo",
+      "label": "General photos",
+      "max": 4
+    },
+    {
+      "id": "cem_notes",
+      "for": "cemetery",
+      "level": "core",
+      "type": "longtext",
+      "label": "Notes"
+    },
+    {
+      "id": "vegetation",
+      "for": "cemetery",
+      "level": "expanded",
+      "type": "choice",
+      "label": "Ground cover",
+      "options": [
+        "Mowed",
+        "Lightly overgrown",
+        "Heavily overgrown",
+        "Wooded"
+      ]
+    },
+    {
+      "id": "signage",
+      "for": "cemetery",
+      "level": "expanded",
+      "type": "yesno",
+      "label": "Is there a sign with the cemetery's name?"
+    },
+    {
+      "id": "graves_visible",
+      "for": "cemetery",
+      "level": "expanded",
+      "type": "number",
+      "label": "About how many stones are visible?"
+    },
+    {
+      "id": "access_notes",
+      "for": "cemetery",
+      "level": "expanded",
+      "type": "text",
+      "label": "How did you get in? (gate, field, permission from\u2026)"
+    },
+    {
+      "id": "feature_type",
+      "for": "marker",
+      "level": "core",
+      "type": "choice",
+      "required": true,
+      "label": "What is it?",
+      "options": [
+        "Headstone",
+        "Footstone",
+        "Fragment / broken piece",
+        "Pile of stones",
+        "Half-buried or sunken stone",
+        "Base only",
+        "Depression (possible grave)",
+        "Above-ground structure / mausoleum",
+        "Unknown"
+      ],
+      "saveTo": "STONE_TYPE"
+    },
+    {
+      "id": "belongs_to",
+      "for": "marker",
+      "level": "core",
+      "type": "markerRef",
+      "label": "Does it belong to a nearby marker? (optional)",
+      "showIf": {
+        "q": "feature_type",
+        "in": [
+          "Footstone",
+          "Fragment / broken piece",
+          "Base only"
+        ]
+      }
+    },
+    {
+      "id": "readable",
+      "for": "marker",
+      "level": "core",
+      "type": "yesno",
+      "label": "Can you read any names or dates?",
+      "showIf": {
+        "q": "feature_type",
+        "in": [
+          "Headstone",
+          "Half-buried or sunken stone",
+          "Above-ground structure / mausoleum",
+          "Footstone"
+        ]
+      }
+    },
+    {
+      "id": "people",
+      "for": "marker",
+      "level": "core",
+      "type": "people",
+      "label": "Who is named on it?",
+      "help": "Add one person at a time. Leave anything you can't read blank.",
+      "showIf": {
+        "q": "readable",
+        "is": "Yes"
+      }
+    },
+    {
+      "id": "condition",
+      "for": "marker",
+      "level": "core",
+      "type": "multi",
+      "label": "Condition (pick all that apply)",
+      "options": [
+        "Standing",
+        "Leaning",
+        "Cracked",
+        "Broken",
+        "Fallen",
+        "Sunken",
+        "Hard to read",
+        "Repaired"
+      ]
+    },
+    {
+      "id": "photos",
+      "for": "marker",
+      "level": "core",
+      "type": "photo",
+      "label": "Photos",
+      "help": "One straight-on photo of the face, plus anything else useful.",
+      "max": 3
+    },
+    {
+      "id": "marker_notes",
+      "for": "marker",
+      "level": "core",
+      "type": "longtext",
+      "label": "Notes"
+    },
+    {
+      "id": "inscription",
+      "for": "marker",
+      "level": "expanded",
+      "type": "longtext",
+      "label": "Full inscription (as written)"
+    },
+    {
+      "id": "material",
+      "for": "marker",
+      "level": "expanded",
+      "type": "choice",
+      "label": "Material",
+      "options": [
+        "Marble",
+        "Limestone",
+        "Sandstone",
+        "Granite",
+        "Slate",
+        "Fieldstone",
+        "Metal",
+        "Concrete",
+        "Wood",
+        "Unknown"
+      ]
+    },
+    {
+      "id": "veteran",
+      "for": "marker",
+      "level": "expanded",
+      "type": "yesno",
+      "label": "Any sign of military service (flag holder, unit, emblem)?"
+    },
+    {
+      "id": "lichen",
+      "for": "marker",
+      "level": "expanded",
+      "type": "choice",
+      "label": "Lichen or moss",
+      "options": [
+        "None",
+        "Light",
+        "Heavy"
+      ]
+    },
+    {
+      "id": "row_plot",
+      "for": "marker",
+      "level": "expanded",
+      "type": "text",
+      "label": "Row / plot, if you can tell"
+    }
+  ]
+}

@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#01796F">
+<title>Cemetery Survey</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+:root{--accent:#01796F;--accent-dark:#015a53;--ink:#1f1b16;--muted:#5f574c;--line:#d8d2c6;--bg:#f4f1e8;--card:#fff;--warn:#8a4b00;--bad:#9b1c1c;--ok:#1d6b3a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{position:sticky;top:0;z-index:20;background:var(--accent);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;padding-top:max(10px,env(safe-area-inset-top))}
+header h1{font-size:18px;margin:0;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{background:transparent;color:#fff;border:1px solid #ffffff88;border-radius:8px;padding:6px 10px;font:inherit;font-size:15px}
+#net{font-size:13px;padding:3px 8px;border-radius:999px;background:#ffffff26}
+main{max-width:640px;margin:0 auto;padding:12px 12px 120px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+h2{font-size:20px;margin:4px 0 10px;font-weight:600}
+h3{font-size:16px;margin:0 0 6px;font-weight:600}
+p{margin:0 0 10px}
+.muted{color:var(--muted);font-size:15px}
+button,.btn{font:inherit;min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.big{width:100%;margin:6px 0;font-size:18px}
+button.small{min-height:40px;padding:6px 12px;font-size:15px}
+button.danger{color:var(--bad);border-color:#e5b4b4}
+button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 auto}
+input[type=text],input[type=number],input[type=search],input[type=date],textarea,select{width:100%;font:inherit;padding:12px;border:1px solid #b9b1a3;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+label.q{display:block;font-weight:600;margin:0 0 6px}
+.q-wrap{padding:12px 0;border-top:1px solid #eee7da}
+.q-wrap:first-child{border-top:0}
+.help{font-size:14px;color:var(--muted);margin:-2px 0 8px}
+.req{color:var(--bad)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{min-height:46px;padding:9px 14px;border:1.5px solid #b9b1a3;border-radius:999px;background:#fff;font-size:16px}
+.opt.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.err{color:var(--bad);font-size:14px;margin-top:6px}
+#mapSlot,.mapSlot{height:46vh;min-height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:0 0 12px;position:relative}
+#map{position:absolute;inset:0}
+#mapBanner{position:absolute;z-index:5;left:8px;right:8px;top:8px;background:#1f1b16e6;color:#fff;border-radius:10px;padding:10px 12px;font-size:15px;display:none;align-items:center;gap:10px}
+#mapBanner.on{display:flex}
+#mapBanner span{flex:1}
+#mapBanner button{min-height:38px;background:#fff;color:var(--ink);border:0}
+#baseBtn{position:absolute;z-index:4;right:8px;bottom:28px;min-height:38px;padding:6px 10px;font-size:14px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs div{position:relative}
+.thumbs img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.thumbs button{position:absolute;top:-8px;right:-8px;min-height:30px;width:30px;padding:0;border-radius:50%;font-size:15px;background:#fff}
+.list{display:flex;flex-direction:column;gap:6px}
+.item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;width:100%}
+.item b{display:block}
+.item small{color:var(--muted)}
+.item .grow{flex:1;min-width:0}
+.pill{font-size:12px;padding:2px 8px;border-radius:999px;background:#eee7da;color:var(--muted);white-space:nowrap}
+.pill.pending{background:#fff1d6;color:var(--warn)}
+.pill.sent{background:#dcf1e3;color:var(--ok)}
+.pill.draft{background:#e8eef9;color:#28457a}
+details.more{margin-top:8px;border:1px dashed #b9b1a3;border-radius:10px;padding:0 12px}
+details.more summary{min-height:48px;display:flex;align-items:center;font-weight:600;cursor:pointer;color:var(--accent-dark)}
+.stack{display:flex;flex-direction:column;gap:6px}
+.sub{border:1px solid #eee7da;border-radius:10px;padding:10px;margin:8px 0;background:#fbfaf6}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:none}
+#bar.on{display:block}
+#bar .in{max-width:640px;margin:0 auto;display:flex;gap:8px}
+#bar .in>*{flex:1}
+#toast{position:fixed;z-index:50;left:50%;bottom:90px;transform:translateX(-50%);background:#1f1b16;color:#fff;padding:12px 16px;border-radius:10px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.hidden{display:none!important}
+.coord{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Cemetery Survey</h1>
+  <span id="net">…</span>
+  <button id="homeBtn" type="button" class="hidden">Home</button>
+</header>
+<main id="main"><div class="card"><p>Loading…</p></div></main>
+<div id="bar"><div class="in" id="barIn"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="mapHome" class="hidden"><div id="map"></div><div id="mapBanner"><span id="mapBannerText"></span><button type="button" id="mapBannerCancel">Cancel</button></div><button type="button" id="baseBtn">Street map</button></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+"use strict";
+/* survey.html - the field survey for invited surveyors.
+   Works without signal: everything is saved on the phone first, and sent to the county inbox when there is signal.
+   Reads settings.json (county, colors, inbox address, lead contact) and survey.json (the questions). */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const el = (tag, props, kids) => { const e = document.createElement(tag); if (props) for (const k in props) { if (k === "class") e.className = props[k]; else if (k === "text") e.textContent = props[k]; else if (k.startsWith("on")) e.addEventListener(k.slice(2), props[k]); else if (props[k] != null && props[k] !== false) e.setAttribute(k, props[k] === true ? "" : props[k]); } (kids || []).forEach(c => c != null && e.append(c)); return e; };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12)).replace(/[^A-Za-z0-9-]/g, "");
+const r6 = n => Math.round(n * 1e6) / 1e6;
+let toastTimer = 0;
+function toast(msg, ms) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), ms || 2800); }
+
+const DEFAULT_INBOX = "https://survey-inbox.cemetery-surveys.workers.dev";
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+
+const NODES = { map: $("map"), banner: $("mapBanner"), bannerText: $("mapBannerText"), cancel: $("mapBannerCancel"), base: $("baseBtn") };
+let S = {}, Q = { questions: [] }, CEMS = [], STONES = [], BOUNDS = { type: "FeatureCollection", features: [] };
+let AREA = "", INBOX = "", invite = null;   // invite: { code, name }
+let current = null;                          // the cemetery being visited
+
+/* ---------------- the phone's own storage (IndexedDB): every survey lives here until the inbox confirms it ---------------- */
+const DB = {
+  db: null,
+  open() { return new Promise((ok, bad) => { const r = indexedDB.open("cemetery-survey", 1); r.onupgradeneeded = () => r.result.createObjectStore("entries", { keyPath: "id" }); r.onsuccess = () => { DB.db = r.result; ok(); }; r.onerror = () => bad(r.error); }); },
+  tx(mode) { return DB.db.transaction("entries", mode).objectStore("entries"); },
+  all() { return new Promise((ok, bad) => { const r = DB.tx("readonly").getAll(); r.onsuccess = () => ok(r.result || []); r.onerror = () => bad(r.error); }); },
+  put(e) { return new Promise((ok, bad) => { const r = DB.tx("readwrite").put(e); r.onsuccess = () => ok(); r.onerror = () => bad(r.error); }); },
+  del(id) { return new Promise((ok, bad) => { const r = DB.tx("readwrite").delete(id); r.onsuccess = () => ok(); r.onerror = () => bad(r.error); }); }
+};
+const mine = e => e.area === AREA;
+
+/* ---------------- loading the county's files ---------------- */
+async function getText(name) { const r = await fetch(new URL(name, document.baseURI).href, { cache: "no-cache" }); if (!r.ok) throw new Error(name + " not found"); return (await r.text()).replace(/^﻿/, ""); }
+async function getCsv(name) { try { return Papa.parse(await getText(name), { header: true, skipEmptyLines: "greedy" }).data; } catch (e) { return []; } }
+async function getJson(name, fallback) { try { return JSON.parse(await getText(name)); } catch (e) { return fallback; } }
+
+async function boot() {
+  try { await DB.open(); } catch (e) { $("main").innerHTML = '<div class="card"><h2>This browser can\'t save surveys</h2><p>Private browsing or a storage setting may be blocking it. Try a normal (not private) window.</p></div>'; return; }
+  S = await getJson("settings.json", {});
+  Q = await getJson("survey.json", { questions: [] });
+  AREA = String(S.idPrefix || S.shortName || "AREA").toUpperCase();
+  INBOX = String(S.inbox || DEFAULT_INBOX).replace(/\/+$/, "");
+  document.documentElement.style.setProperty("--accent", (S.colors && S.colors.public) || "#01796F");
+  $("title").textContent = (S.name ? S.name + " " : "") + "Cemetery Survey";
+  document.title = $("title").textContent;
+  const files = S.files || {};
+  const [cems, stones, bounds] = await Promise.all([getCsv(files.cemeteries || "cemlist.csv"), getCsv(files.interments || "interments.csv"), getJson(files.boundaries || "cemetery-boundaries.geojson", null)]);
+  CEMS = cems.filter(r => r.ID && String(r.HIDE || "").trim() !== "1").map(r => ({ id: r.ID.trim(), name: r.NAME || r.ID, other: r.OTHER_NAMES || "", ll: [parseFloat(r.LONG), parseFloat(r.LAT)], township: r.TOWNSHIP || "" }));
+  STONES = stones; if (bounds && bounds.features) BOUNDS = bounds;
+
+  // the invite arrives once in the link (?invite=CODE), then lives on this phone
+  const qs = new URLSearchParams(location.search), code = (qs.get("invite") || "").trim().toUpperCase();
+  if (code) { store.set("invite:" + AREA, JSON.stringify({ code, name: "" })); history.replaceState(null, "", location.pathname); }
+  try { invite = JSON.parse(store.get("invite:" + AREA) || "null"); } catch (e) { invite = null; }
+
+  window.addEventListener("online", () => { netBadge(); sendPending(true); });
+  window.addEventListener("offline", netBadge);
+  netBadge();
+  $("homeBtn").onclick = () => showHome();
+  if (!invite) return showNoInvite();
+  checkInvite();
+  await pruneSent();
+  showHome();
+  sendPending(true);
+}
+function netBadge() { $("net").textContent = navigator.onLine ? "Online" : "Offline"; }
+
+async function checkInvite() {   // quietly confirm the invite still works and learn the surveyor's name
+  if (!navigator.onLine || !invite) return;
+  try {
+    const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": invite.code } }), j = await r.json();
+    if (j.ok) { invite.name = j.name; store.set("invite:" + AREA, JSON.stringify(invite)); const g = $("greet"); if (g) g.textContent = "Signed in as " + j.name; }
+    else if (r.status === 403) { invite.revoked = true; showHome(); }
+  } catch (e) {}
+}
+
+function contactLine() {
+  const c = S.contact || {};
+  const bits = [c.name, c.email ? '<a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a>" : "", c.phone].filter(Boolean);
+  return bits.length ? bits.map(b => b.startsWith("<a") ? b : esc(b)).join(" · ") : "the county's survey lead";
+}
+function showNoInvite() {
+  $("homeBtn").classList.add("hidden"); bar([]);
+  $("main").innerHTML = '<div class="card"><h2>Would you like to help survey?</h2><p>Surveys are done by invited volunteers so every record can be checked. To get an invite, contact ' + contactLine() + ".</p>" +
+    '<p class="muted">Already have an invite link? Open it on this phone and the survey unlocks.</p><p><a href="test3.html">Back to the map</a></p></div>';
+}
+
+/* ---------------- home ---------------- */
+async function showHome() {
+  current = null; stopMapModes(); $("homeBtn").classList.add("hidden");
+  const all = (await DB.all()).filter(mine).sort((a, b) => b.updated.localeCompare(a.updated));
+  const pend = all.filter(e => e.status === "pending"), drafts = all.filter(e => e.status === "draft");
+  const m = $("main"); m.innerHTML = "";
+  if (invite && invite.revoked) { const w = el("div", { class: "card", style: "border-color:#e5b4b4" }); w.innerHTML = "<h3>Your invite is no longer active</h3><p>Surveys saved on this phone are kept. Contact " + contactLine() + " for a new invite.</p>"; m.append(w); }
+  m.append(el("div", { class: "card" }, [
+    el("p", { id: "greet", class: "muted", text: invite && invite.name ? "Signed in as " + invite.name : "Invite saved on this phone" }),
+    el("button", { type: "button", class: "primary big", text: "Start a cemetery visit", onclick: pickCemetery }),
+    el("p", { class: "muted", style: "margin-top:8px", text: "Everything saves on this phone first. It sends itself when you have signal." })
+  ]));
+  const card = el("div", { class: "card" }, [el("h3", { text: "Your surveys" })]);
+  if (!all.length) card.append(el("p", { class: "muted", text: "Nothing saved yet." }));
+  const list = el("div", { class: "list" });
+  all.slice(0, 60).forEach(e => list.append(entryRow(e)));
+  card.append(list); m.append(card);
+  const unsent = pend.length + drafts.length;
+  bar(unsent ? [
+    el("button", { type: "button", class: "primary", text: pend.length ? "Send now (" + pend.length + ")" : "Nothing to send", disabled: !pend.length || !navigator.onLine || (invite && invite.revoked), onclick: () => sendPending(false) }),
+    el("button", { type: "button", text: "Save to a file", onclick: exportUnsent })
+  ] : []);
+}
+function entryTitle(e) {
+  const c = CEMS.find(x => x.id === e.cemetery), cn = c ? c.name : e.cemetery;
+  if (e.kind === "cemetery") return "Cemetery details · " + cn;
+  const a = e.answers || {}, p = (a.people || [])[0], who = p && (p.first || p.last) ? [p.first, p.last].filter(Boolean).join(" ") : "";
+  return (a.feature_type || "Marker") + (who ? " · " + who : "") + " · " + cn;
+}
+function entryRow(e) {
+  const when = new Date(e.updated).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const pill = { draft: "Not finished", pending: "Waiting to send", sent: "Sent" }[e.status] || e.status;
+  return el("div", { class: "item" }, [
+    el("div", { class: "grow" }, [el("b", { text: entryTitle(e) }), el("small", { text: when + (e.error ? " · " + e.error : "") })]),
+    el("span", { class: "pill " + e.status, text: pill }),
+    e.status !== "sent" ? el("button", { type: "button", class: "small", text: "Open", onclick: () => openEntry(e) }) : null
+  ]);
+}
+function bar(buttons) { const b = $("barIn"); b.innerHTML = ""; buttons.forEach(x => b.append(x)); $("bar").classList.toggle("on", buttons.length > 0); }
+
+/* ---------------- choosing a cemetery ---------------- */
+let here = null;
+function pickCemetery() {
+  $("homeBtn").classList.remove("hidden"); bar([]);
+  const m = $("main"); m.innerHTML = "";
+  const search = el("input", { type: "search", placeholder: "Search by name", "aria-label": "Search cemeteries" });
+  const list = el("div", { class: "list" });
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    let rows = CEMS.filter(c => !q || (c.name + " " + c.other + " " + c.id).toLowerCase().includes(q));
+    if (here) rows = rows.map(c => Object.assign({}, c, { d: isFinite(c.ll[0]) ? dist(here, c.ll) : 1e9 })).sort((a, b) => a.d - b.d);
+    list.innerHTML = "";
+    rows.slice(0, 80).forEach(c => list.append(el("button", { type: "button", class: "item", onclick: () => startVisit(c) }, [
+      el("div", { class: "grow" }, [el("b", { text: c.name }), el("small", { text: [c.id, c.township, c.other].filter(Boolean).join(" · ") + (c.d != null && c.d < 1e8 ? " · " + miles(c.d) : "") })])
+    ])));
+    if (!rows.length) list.append(el("p", { class: "muted", text: "No match." }));
+  };
+  search.oninput = draw;
+  m.append(el("div", { class: "card" }, [el("h2", { text: "Which cemetery?" }), search,
+    el("button", { type: "button", class: "small", style: "margin:8px 0", text: "Sort by nearest", onclick: async () => { try { const p = await locate(); here = p.ll; draw(); } catch (e) { toast(e.message); } } }), list]));
+  draw();
+}
+const dist = (a, b) => { const k = Math.cos(a[1] * Math.PI / 180); return Math.hypot((a[0] - b[0]) * k, a[1] - b[1]) * 111320; };
+const miles = m => m < 160 ? Math.round(m * 3.28084) + " ft" : (m / 1609.344).toFixed(1) + " mi";
+
+/* ---------------- a visit: the map plus the two kinds of entry ---------------- */
+async function startVisit(c) {
+  current = c; $("homeBtn").classList.remove("hidden");
+  const m = $("main"); m.innerHTML = "";
+  const slot = el("div", { class: "mapSlot" }); m.append(slot);
+  await mountMap(slot); focusCemetery(c);
+  const saved = (await DB.all()).filter(e => e.area === AREA && e.cemetery === c.id);
+  const hasCem = saved.find(e => e.kind === "cemetery" && e.status !== "sent");
+  m.append(el("div", { class: "card" }, [
+    el("h2", { text: c.name }),
+    el("button", { type: "button", class: "big", text: hasCem ? "Continue cemetery details" : "Cemetery details (entrance, boundary, fence, hazards)", onclick: () => hasCem ? openEntry(hasCem) : newEntry("cemetery", { type: "cemetery", id: c.id }) }),
+    el("h3", { style: "margin-top:12px", text: "Record a marker or something found" }),
+    el("button", { type: "button", class: "primary big", text: "Tap a marker already on the map", onclick: () => pickExisting() }),
+    el("button", { type: "button", class: "big", text: "New: use my location", onclick: async () => { try { const p = await locate(); newEntry("marker", { type: "new", id: "" }, p); } catch (e) { toast(e.message); } } }),
+    el("button", { type: "button", class: "big", text: "New: tap the map", onclick: () => tapMap("Tap where it is on the map.", ll => newEntry("marker", { type: "new", id: "" }, { ll, acc: null, how: "map" })) }),
+    el("p", { class: "muted", style: "margin-top:8px", text: saved.length ? saved.length + " saved here on this phone." : "Gray dots are markers already recorded. Green dots are ones you've added." })
+  ]));
+  bar([el("button", { type: "button", text: "Done with this cemetery", onclick: showHome })]);
+}
+
+/* existing stones in this cemetery, one per MARKER_ID */
+function stonesIn(cid) {
+  const by = new Map();
+  STONES.filter(r => String(r.CEMETERY_ID || "").trim() === cid).forEach(r => {
+    const id = String(r.MARKER_ID || r.PERSON_ID || "").trim(), lat = parseFloat(r.LAT), lng = parseFloat(r.LONG);
+    if (!id || !isFinite(lat) || !isFinite(lng)) return;
+    const name = [r["FIRST NAME"], r["LAST NAME"]].filter(Boolean).join(" ");
+    if (!by.has(id)) by.set(id, { id, ll: [lng, lat], names: [] });
+    if (name) by.get(id).names.push(name);
+  });
+  return [...by.values()];
+}
+async function sessionMarkers(cid) {   // markers added on this phone (not yet in the CSV)
+  return (await DB.all()).filter(e => e.area === AREA && e.cemetery === cid && e.kind === "marker" && e.where && e.target.type === "new")
+    .map(e => ({ id: "new:" + e.id.slice(0, 8), ll: e.where.ll, names: [entryTitle(e).split(" · ")[0]], entry: e.id }));
+}
+function pickExisting() {
+  const list = stonesIn(current.id);
+  if (!list.length) return toast("No markers are on the map for this cemetery yet. Use New instead.");
+  tapMap("Tap the marker you're recording.", ll => {
+    let best = null; list.forEach(s => { const d = dist(ll, s.ll); if (!best || d < best.d) best = { s, d }; });
+    if (!best || best.d > 25) { toast("No marker there. Zoom in and tap right on a gray dot."); return pickExisting(); }
+    newEntry("marker", { type: "marker", id: best.s.id }, { ll: best.s.ll, acc: null, how: "existing" }, best.s);
+  });
+}
+
+/* ---------------- the map ---------------- */
+let map = null, mapReady = null, aerial = true, tapCb = null;
+function mountMap(slot) {
+  slot.append(NODES.map, NODES.banner, NODES.base);
+  if (!map) {
+    map = new maplibregl.Map({ container: NODES.map, attributionControl: { compact: true }, center: S.center || [-85.0, 39.6], zoom: S.zoom || 11,
+      style: { version: 8, sources: {
+        osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: "&copy; OpenStreetMap contributors" },
+        usgs: { type: "raster", tiles: ["https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 16, attribution: "USGS The National Map" },
+        indiana: { type: "raster", tiles: ["https://di-ingov.img.arcgis.com/arcgis/rest/services/DynamicWebMercator/Indiana_Current_Imagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpgpng&f=image"], tileSize: 256, maxzoom: 20, attribution: "Indiana Geographic Information Office" }
+      }, layers: [{ id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } }, { id: "usgs", type: "raster", source: "usgs" }, { id: "indiana", type: "raster", source: "indiana" }] } });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), "top-right");
+    mapReady = new Promise(ok => map.on("load", () => {
+      const empty = { type: "FeatureCollection", features: [] };
+      map.addSource("bounds", { type: "geojson", data: BOUNDS });
+      map.addLayer({ id: "bounds-fill", type: "fill", source: "bounds", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.08 } });
+      map.addLayer({ id: "bounds-line", type: "line", source: "bounds", paint: { "line-color": (S.colors && S.colors.boundary) || "#01796F", "line-width": 2.5 } });
+      map.addSource("stones", { type: "geojson", data: empty });
+      map.addLayer({ id: "stones", type: "circle", source: "stones", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 3, 20, 9], "circle-color": ["case", ["get", "mine"], "#22c55e", "#e5e1d8"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 1.5 } });
+      map.addSource("draft", { type: "geojson", data: empty });
+      map.addLayer({ id: "draft-fill", type: "fill", source: "draft", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#facc15", "fill-opacity": 0.2 } });
+      map.addLayer({ id: "draft-line", type: "line", source: "draft", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#facc15", "line-width": 3 } });
+      map.addLayer({ id: "draft-pts", type: "circle", source: "draft", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": ["coalesce", ["get", "color"], "#facc15"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 2 } });
+      ok();
+    }));
+    map.on("click", e => { if (tapCb) { const cb = tapCb; clearTap(); cb([r6(e.lngLat.lng), r6(e.lngLat.lat)]); } });
+    NODES.cancel.onclick = stopMapModes;
+    NODES.base.onclick = () => { aerial = !aerial; ["usgs", "indiana"].forEach(l => map.setLayoutProperty(l, "visibility", aerial ? "visible" : "none")); map.setLayoutProperty("osm", "visibility", aerial ? "none" : "visible"); NODES.base.textContent = aerial ? "Street map" : "Aerial"; };
+  }
+  setTimeout(() => map.resize(), 30);
+  return mapReady;
+}
+async function focusCemetery(c) {
+  await mapReady; await refreshStones();
+  const b = BOUNDS.features.find(f => f.properties && String(f.properties.CEMETERY_ID) === c.id && f.geometry && f.geometry.type === "Polygon");
+  if (b) { const bb = new maplibregl.LngLatBounds(); b.geometry.coordinates[0].forEach(p => bb.extend(p)); map.fitBounds(bb, { padding: 30, maxZoom: 19, animate: false }); }
+  else if (isFinite(c.ll[0])) map.jumpTo({ center: c.ll, zoom: 17.5 });
+}
+async function refreshStones() {
+  if (!map || !current) return; await mapReady;
+  const feats = stonesIn(current.id).map(s => ({ type: "Feature", properties: { mine: false }, geometry: { type: "Point", coordinates: s.ll } }))
+    .concat((await sessionMarkers(current.id)).map(s => ({ type: "Feature", properties: { mine: true }, geometry: { type: "Point", coordinates: s.ll } })));
+  map.getSource("stones").setData({ type: "FeatureCollection", features: feats });
+}
+function setDraft(feats) { if (map && map.getSource("draft")) map.getSource("draft").setData({ type: "FeatureCollection", features: feats || [] }); }
+let cancelHook = null;   // lets "Draw on the map" know the surveyor pressed Cancel
+function tapMap(text, cb) { tapCb = cb; NODES.bannerText.textContent = text; NODES.banner.classList.add("on"); map.getCanvas().style.cursor = "crosshair"; const s = NODES.map.parentElement; if (s && s.getBoundingClientRect().top < 0) s.scrollIntoView({ behavior: "smooth", block: "start" }); }
+function clearTap() { tapCb = null; NODES.banner.classList.remove("on"); if (map) map.getCanvas().style.cursor = ""; }
+function stopMapModes() { const h = cancelHook; cancelHook = null; clearTap(); NODES.cancel.textContent = "Cancel"; if (h) h(); }
+
+/* GPS: one careful reading. Waits up to 20 s for a good fix and keeps the best one. */
+function locate() {
+  return new Promise((ok, bad) => {
+    if (!navigator.geolocation) return bad(new Error("This phone can't share its location with the page."));
+    toast("Getting your location… hold still.", 20000);
+    let best = null, done = false;
+    const finish = () => { if (done) return; done = true; navigator.geolocation.clearWatch(w); clearTimeout(t); $("toast").classList.remove("on"); best ? ok(best) : bad(new Error("Couldn't get a location. Check that location is on for this browser, or tap the map instead.")); };
+    const w = navigator.geolocation.watchPosition(p => {
+      const g = { ll: [r6(p.coords.longitude), r6(p.coords.latitude)], acc: Math.round(p.coords.accuracy), how: "gps", at: new Date().toISOString() };
+      if (!best || g.acc < best.acc) best = g;
+      if (best.acc <= 5) finish();
+    }, e => { if (!best) { done = true; navigator.geolocation.clearWatch(w); clearTimeout(t); $("toast").classList.remove("on"); bad(new Error(e.code === 1 ? "Location permission was refused. Allow location for this site in the browser settings." : "Couldn't get a location. Try again, or tap the map.")); } }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    const t = setTimeout(finish, 20000);
+  });
+}
+const accText = g => g ? (g.how === "gps" ? "GPS, about " + Math.round(g.acc * 3.28084) + " ft accuracy" + (g.acc > 15 ? " (weak: try again in the open, or tap the map)" : "") : g.how === "existing" ? "Existing marker" : "Placed on the map") : "";
+
+/* ---------------- entries ---------------- */
+async function newEntry(kind, target, where, stone) {
+  const e = { id: uid(), area: AREA, kind, cemetery: current.id, target, where: where || null, answers: {}, status: "draft", created: new Date().toISOString(), updated: new Date().toISOString(), stoneNames: stone ? stone.names : [] };
+  if (kind === "marker" && stone && stone.names.length) e.answers.readable = "Yes";
+  await DB.put(e); openEntry(e);
+}
+async function openEntry(e) {
+  if (!current || current.id !== e.cemetery) current = CEMS.find(c => c.id === e.cemetery) || { id: e.cemetery, name: e.cemetery, ll: [NaN, NaN] };
+  $("homeBtn").classList.remove("hidden");
+  const m = $("main"); m.innerHTML = "";
+  const slot = el("div", { class: "mapSlot" }); m.append(slot);
+  await mountMap(slot);
+  if (e.where) { await mapReady; map.jumpTo({ center: e.where.ll, zoom: Math.max(map.getZoom(), 19) }); } else focusCemetery(current);
+  await refreshStones();
+  renderForm(e);
+}
+
+function visible(q, a) {
+  const s = q.showIf; if (!s) return true;
+  const v = a[s.q];
+  if (s.is != null) return Array.isArray(v) ? v.includes(s.is) : v === s.is;
+  if (s.in) return Array.isArray(v) ? v.some(x => s.in.includes(x)) : s.in.includes(v);
+  return true;
+}
+const optionsOf = q => q.options || (q.optionsFrom && Q[q.optionsFrom]) || [];
+
+function renderForm(e) {
+  const m = $("main"), qs = Q.questions.filter(q => q.for === e.kind || q.for === "both");
+  let box = $("formBox"); if (box) box.remove();
+  box = el("div", { id: "formBox" });
+  const head = el("div", { class: "card" }, [
+    el("h2", { text: e.kind === "cemetery" ? "Cemetery details" : (e.target.type === "marker" ? "Existing marker" : "New marker or find") }),
+    el("p", { class: "muted", text: current.name + (e.stoneNames && e.stoneNames.length ? " · on record: " + e.stoneNames.join(", ") : "") }),
+    e.where ? el("p", { class: "coord", text: accText(e.where) }) : null,
+    e.kind === "marker" && e.target.type === "new" ? el("button", { type: "button", class: "small", text: "Move this point", onclick: () => tapMap("Tap the new spot.", async ll => { e.where = { ll, acc: null, how: "map" }; await save(e); renderForm(e); refreshStones(); }) }) : null
+  ]);
+  box.append(head);
+  const core = el("div", { class: "card" }), more = el("details", { class: "more" }, [el("summary", { text: "Add more detail (optional)" })]);
+  if (store.get("expandMore") === "1") more.open = true;
+  more.addEventListener("toggle", () => store.set("expandMore", more.open ? "1" : "0"));
+  const moreBody = el("div");
+  qs.forEach(q => { if (!visible(q, e.answers)) return; (q.level === "expanded" ? moreBody : core).append(question(q, e)); });
+  if (moreBody.childNodes.length) { more.append(moreBody); core.append(more); }
+  box.append(core);
+  m.append(box);
+  if (e.kind === "cemetery") drawCemDraft(e); else setDraft(e.where ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: e.where.ll } }] : []);
+  bar([
+    el("button", { type: "button", class: "danger", text: "Delete", onclick: async () => { if (!confirm("Delete this survey from the phone?")) return; await DB.del(e.id); toast("Deleted."); current ? startVisit(current) : showHome(); } }),
+    el("button", { type: "button", class: "primary", text: "Save", onclick: () => finish(e) })
+  ]);
+}
+async function save(e) { e.updated = new Date().toISOString(); await DB.put(e); }
+let saveTimer = 0;
+function changed(e, rerender) { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(e), 300); if (rerender) { save(e).then(() => { const y = window.scrollY; renderForm(e); window.scrollTo(0, y); }); } }
+
+async function finish(e) {
+  const missing = Q.questions.filter(q => (q.for === e.kind) && q.required && visible(q, e.answers) && (e.answers[q.id] == null || e.answers[q.id] === "" || (Array.isArray(e.answers[q.id]) && !e.answers[q.id].length)));
+  if (missing.length) { toast("Please answer: " + missing.map(q => q.label).join(", ")); return; }
+  if (e.kind === "marker" && !e.where) { toast("Place it on the map first."); return; }
+  const b = e.answers.boundary; if (b && b.length && b.length < 3) { toast("A boundary needs at least 3 corners, or clear it."); return; }
+  e.status = "pending"; e.error = ""; await save(e);
+  toast(navigator.onLine ? "Saved. Sending…" : "Saved on this phone. It will send when you have signal.");
+  sendPending(true);
+  stopMapModes(); setDraft([]);
+  current ? startVisit(current) : showHome();
+}
+
+/* one question */
+function question(q, e) {
+  const a = e.answers, wrap = el("div", { class: "q-wrap" });
+  wrap.append(el("label", { class: "q" }, [document.createTextNode(q.label), q.required ? el("span", { class: "req", text: " *" }) : null]));
+  if (q.help) wrap.append(el("div", { class: "help", text: q.help }));
+  const set = (v, rerender) => { if (v == null || v === "" || (Array.isArray(v) && !v.length)) delete a[q.id]; else a[q.id] = v; changed(e, rerender); };
+  const rerenderOnChange = Q.questions.some(x => x.showIf && x.showIf.q === q.id);
+
+  if (q.type === "yesno" || q.type === "choice") {
+    const opts = q.type === "yesno" ? ["Yes", "No"] : optionsOf(q), box = el("div", { class: "opts", role: "group" });
+    opts.forEach(o => box.append(el("button", { type: "button", class: "opt" + (a[q.id] === o ? " on" : ""), "aria-pressed": String(a[q.id] === o), text: o, onclick: () => { set(a[q.id] === o ? null : o, true); } })));
+    wrap.append(box);
+  } else if (q.type === "multi") {
+    const cur = new Set(a[q.id] || []), box = el("div", { class: "opts", role: "group" });
+    optionsOf(q).forEach(o => box.append(el("button", { type: "button", class: "opt" + (cur.has(o) ? " on" : ""), "aria-pressed": String(cur.has(o)), text: o, onclick: () => { cur.has(o) ? cur.delete(o) : cur.add(o); set(optionsOf(q).filter(x => cur.has(x)), true); } })));
+    wrap.append(box);
+  } else if (q.type === "text" || q.type === "number" || q.type === "date") {
+    wrap.append(el("input", { type: q.type === "text" ? "text" : q.type, value: a[q.id] || "", inputmode: q.type === "number" ? "numeric" : null, oninput: ev => set(ev.target.value.trim(), false), onchange: () => rerenderOnChange && changed(e, true) }));
+  } else if (q.type === "longtext") {
+    const t = el("textarea", { oninput: ev => set(ev.target.value, false) }); t.value = a[q.id] || ""; wrap.append(t);
+  } else if (q.type === "photo") {
+    wrap.append(photoInput(q, e, set));
+  } else if (q.type === "gps") {
+    const g = a[q.id];
+    wrap.append(el("div", { class: "row" }, [
+      el("button", { type: "button", text: "Use my location", onclick: async () => { try { set(await locate(), true); } catch (er) { toast(er.message); } } }),
+      el("button", { type: "button", text: "Tap the map", onclick: () => tapMap("Tap the " + q.label.toLowerCase() + ".", ll => set({ ll, acc: null, how: "map" }, true)) })
+    ]));
+    if (g) wrap.append(el("p", { class: "coord", text: accText(g) + " · " + g.ll[1].toFixed(6) + ", " + g.ll[0].toFixed(6) }), el("button", { type: "button", class: "small danger", text: "Clear", onclick: () => set(null, true) }));
+  } else if (q.type === "polygon") {
+    wrap.append(polygonInput(q, e, set));
+  } else if (q.type === "points") {
+    wrap.append(pointsInput(q, e, set));
+  } else if (q.type === "markerRef") {
+    wrap.append(markerRefInput(q, e, set));
+  } else if (q.type === "people") {
+    wrap.append(peopleInput(q, e, set));
+  }
+  return wrap;
+}
+
+/* photos: shrunk on the phone to about 1600 px so they send quickly and fit the inbox */
+function shrink(file, max) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+      const c = document.createElement("canvas"); c.width = Math.round(w * s); c.height = Math.round(h * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let q = 0.82, out = c.toDataURL("image/jpeg", q);
+      while (out.length > 1800000 && q > 0.4) { q -= 0.12; out = c.toDataURL("image/jpeg", q); }
+      ok(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That photo couldn't be read.")); };
+    img.src = url;
+  });
+}
+function photoInput(q, e, set) {
+  const list = e.answers[q.id] || [], max = q.max || 3, box = el("div");
+  const input = el("input", { type: "file", accept: "image/*", capture: "environment", class: "hidden" });
+  input.onchange = async () => {
+    const files = [...input.files].slice(0, max - list.length);
+    for (const f of files) { try { list.push(await shrink(f, 1600)); } catch (er) { toast(er.message); } }
+    set(list.slice(), true);
+  };
+  const pick = el("input", { type: "file", accept: "image/*", multiple: true, class: "hidden" });
+  pick.onchange = async () => { const files = [...pick.files].slice(0, max - list.length); for (const f of files) { try { list.push(await shrink(f, 1600)); } catch (er) { toast(er.message); } } set(list.slice(), true); };
+  box.append(input, pick, el("div", { class: "row" }, [
+    el("button", { type: "button", text: "Take photo", disabled: list.length >= max, onclick: () => input.click() }),
+    el("button", { type: "button", text: "Choose photo", disabled: list.length >= max, onclick: () => pick.click() })
+  ]));
+  const th = el("div", { class: "thumbs" });
+  list.forEach((src, i) => th.append(el("div", {}, [el("img", { src, alt: "Photo " + (i + 1) }), el("button", { type: "button", "aria-label": "Remove photo", text: "✕", onclick: () => { list.splice(i, 1); set(list.slice(), true); } })])));
+  box.append(th, el("div", { class: "help", style: "margin-top:6px", text: list.length + " of " + max }));
+  return box;
+}
+
+/* boundary: walk the corners with GPS, or tap them on the aerial map */
+function polygonInput(q, e, set) {
+  const pts = (e.answers[q.id] || []).slice(), box = el("div");
+  const add = p => { pts.push(p); set(pts.slice(), false); drawCemDraft(e); refresh(); };
+  const info = el("p", { class: "coord" });
+  const refresh = () => { info.textContent = pts.length ? pts.length + " corner" + (pts.length === 1 ? "" : "s") + (pts.length >= 3 ? " · closed shape" : " · need at least 3") : "No corners yet."; };
+  let drawing = false;
+  const drawBtn = el("button", { type: "button", text: "Draw on the map" });
+  const keepTapping = () => tapMap("Tap each corner in order. Tap Done when finished.", ll => { add({ ll, acc: null, how: "map" }); if (drawing) { keepTapping(); NODES.cancel.textContent = "Done"; } });
+  const stop = () => { drawing = false; drawBtn.textContent = "Draw on the map"; };
+  drawBtn.onclick = () => { if (drawing) { stopMapModes(); return; } drawing = true; drawBtn.textContent = "Stop drawing"; cancelHook = stop; keepTapping(); };
+  box.append(el("div", { class: "row" }, [
+    el("button", { type: "button", class: "primary", text: "Add corner here (GPS)", onclick: async () => { try { add(await locate()); } catch (er) { toast(er.message); } } }),
+    drawBtn
+  ]), info, el("div", { class: "row" }, [
+    el("button", { type: "button", class: "small", text: "Undo last corner", onclick: () => { pts.pop(); set(pts.slice(), false); drawCemDraft(e); refresh(); } }),
+    el("button", { type: "button", class: "small danger", text: "Clear", onclick: () => { if (!pts.length || confirm("Clear all corners?")) { pts.length = 0; set(null, false); drawCemDraft(e); refresh(); } } })
+  ]));
+  refresh();
+  return box;
+}
+
+/* hazard spots: any number, each with a place, a type and a note */
+function pointsInput(q, e, set) {
+  const list = (e.answers[q.id] || []).slice(), box = el("div"), opts = optionsOf(q);
+  list.forEach((p, i) => {
+    const typeSel = el("select", { "aria-label": "Hazard type", onchange: ev => { p.type = ev.target.value; set(list.slice(), false); } }, [el("option", { value: "", text: "What is it?" })].concat(opts.map(o => el("option", { value: o, text: o, selected: p.type === o }))));
+    const note = el("input", { type: "text", placeholder: "Note (e.g. marked from the road)", value: p.note || "", oninput: ev => { p.note = ev.target.value; set(list.slice(), false); } });
+    box.append(el("div", { class: "sub" }, [el("div", { class: "coord", text: "Spot " + (i + 1) + " · " + accText(p.where) }), typeSel, el("div", { style: "height:6px" }), note,
+      el("button", { type: "button", class: "small danger", style: "margin-top:6px", text: "Remove spot", onclick: () => { list.splice(i, 1); set(list.slice(), true); } })]));
+  });
+  const addAt = where => { list.push({ where, type: "", note: "" }); set(list.slice(), true); };
+  box.append(el("div", { class: "row" }, [
+    el("button", { type: "button", text: "Add spot: my location", onclick: async () => { try { addAt(await locate()); } catch (er) { toast(er.message); } } }),
+    el("button", { type: "button", text: "Add spot: tap map", onclick: () => tapMap("Tap where the hazard is.", ll => addAt({ ll, acc: null, how: "map" })) })
+  ]));
+  return box;
+}
+function drawCemDraft(e) {
+  const a = e.answers, f = [];
+  if (a.boundary && a.boundary.length) {
+    const ring = a.boundary.map(p => p.ll);
+    f.push(ring.length >= 3 ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring.concat([ring[0]])] } } : { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: ring.length > 1 ? ring : [ring[0], ring[0]] } });
+    ring.forEach(p => f.push({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: p } }));
+  }
+  if (a.entrance_point) f.push({ type: "Feature", properties: { color: "#22c55e" }, geometry: { type: "Point", coordinates: a.entrance_point.ll } });
+  (a.hazard_spots || []).forEach(h => f.push({ type: "Feature", properties: { color: "#ef4444" }, geometry: { type: "Point", coordinates: h.where.ll } }));
+  setDraft(f);
+}
+
+/* "belongs to": the nearest markers, so a footstone or fragment can be linked to its headstone */
+function markerRefInput(q, e, set) {
+  const box = el("div"), sel = el("select", { onchange: ev => set(ev.target.value, false) }, [el("option", { value: "", text: "Not sure / none" })]);
+  box.append(sel);
+  sessionMarkers(current.id).then(extra => {
+    const here = e.where && e.where.ll, all = stonesIn(current.id).concat(extra.filter(x => x.entry !== e.id));
+    const near = here ? all.map(s => Object.assign({}, s, { d: dist(here, s.ll) })).sort((a, b) => a.d - b.d).slice(0, 8) : all.slice(0, 8);
+    near.forEach(s => sel.append(el("option", { value: s.id, selected: e.answers[q.id] === s.id, text: (s.names.join(", ") || s.id) + (s.d != null ? " · " + miles(s.d) + " away" : "") })));
+    if (!near.length) box.append(el("p", { class: "help", text: "No markers nearby yet." }));
+  });
+  return box;
+}
+
+/* the people named on a stone */
+function peopleInput(q, e, set) {
+  const list = (e.answers[q.id] || []).map(p => Object.assign({}, p)), box = el("div");
+  const F = [["first", "First name"], ["last", "Last name"], ["birth", "Born (as written)"], ["death", "Died (as written)"]];
+  list.forEach((p, i) => {
+    const sub = el("div", { class: "sub" }, [el("div", { class: "coord", text: "Person " + (i + 1) })]);
+    F.forEach(([k, lab]) => sub.append(el("input", { type: "text", placeholder: lab, "aria-label": lab, value: p[k] || "", style: "margin:4px 0", oninput: ev => { p[k] = ev.target.value; set(list.map(x => Object.assign({}, x)), false); } })));
+    const sx = el("div", { class: "opts", style: "margin-top:4px" });
+    [["F", "Female"], ["M", "Male"], ["U", "Unknown"]].forEach(([v, t]) => sx.append(el("button", { type: "button", class: "opt" + (p.sex === v ? " on" : ""), text: t, onclick: () => { p.sex = p.sex === v ? "" : v; set(list.map(x => Object.assign({}, x)), true); } })));
+    sub.append(sx, el("button", { type: "button", class: "small danger", style: "margin-top:6px", text: "Remove person", onclick: () => { list.splice(i, 1); set(list, true); } }));
+    box.append(sub);
+  });
+  box.append(el("button", { type: "button", text: list.length ? "Add another person" : "Add a person", onclick: () => { list.push({}); set(list, true); } }));
+  return box;
+}
+
+/* ---------------- sending ---------------- */
+let sending = false;
+function packForInbox(e) {   // photos travel separately from the answers; answers point at them as "media:N"
+  const media = [], data = JSON.parse(JSON.stringify(e.answers));
+  const take = src => { const m = /^data:([^;]+);base64,(.*)$/.exec(src || ""); if (!m) return null; media.push({ mime: m[1], data: m[2] }); return "media:" + (media.length - 1); };
+  Q.questions.forEach(q => { if (q.type === "photo" && Array.isArray(data[q.id])) data[q.id] = data[q.id].map(take).filter(Boolean); });
+  data._cemetery = e.cemetery; data._where = e.where; data._kind = e.kind; data._form = Q.version || 1;
+  return { id: e.id, kind: "survey", target: e.target, data, media: media.slice(0, 6), created: e.created, submitter: invite && invite.name || "" };
+}
+async function sendPending(quiet) {
+  if (sending || !navigator.onLine || !invite || invite.revoked) return;
+  const pend = (await DB.all()).filter(e => mine(e) && e.status === "pending");
+  if (!pend.length) { if (!quiet) toast("Nothing waiting to send."); return; }
+  sending = true; let sent = 0, failed = "";
+  for (const e of pend) {                               // one at a time: a big photo batch on weak signal is more likely to get through
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/submit", { method: "POST", headers: { "Content-Type": "application/json", "X-Invite": invite.code }, body: JSON.stringify(packForInbox(e)) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { e.status = "sent"; e.sentAt = new Date().toISOString(); e.error = ""; await DB.put(e); sent++; }
+      else { if (r.status === 403) { invite.revoked = true; store.set("invite:" + AREA, JSON.stringify(invite)); } e.error = j.error || ("Inbox said " + r.status); await DB.put(e); failed = e.error; if (r.status === 403) break; }
+    } catch (er) { failed = "No connection to the inbox. It will try again."; break; }
+  }
+  sending = false;
+  if (sent) toast("Sent " + sent + " survey" + (sent === 1 ? "" : "s") + ". Thank you!");
+  else if (failed && !quiet) toast(failed);
+  if (!current && !$("formBox")) showHome();
+}
+async function pruneSent() { const old = Date.now() - 14 * 864e5; for (const e of await DB.all()) if (e.status === "sent" && e.sentAt && Date.parse(e.sentAt) < old) await DB.del(e.id); }
+
+/* the safety net: everything not yet sent, as one file the lead can import */
+async function exportUnsent() {
+  const list = (await DB.all()).filter(e => mine(e) && e.status !== "sent");
+  if (!list.length) return toast("Nothing unsent.");
+  const blob = new Blob([JSON.stringify({ type: "cemetery-survey-export", area: AREA, invite: invite && invite.code, surveyor: invite && invite.name, exported: new Date().toISOString(), submissions: list.map(packForInbox) })], { type: "application/json" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: AREA + "-surveys-" + new Date().toISOString().slice(0, 10) + ".json" });
+  document.body.append(a); a.click(); a.remove(); toast("Saved. Send that file to your county lead.");
+}
+
+boot();
+</script>
+</body>
+</html>

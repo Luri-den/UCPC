@@ -192,5 +192,11 @@
         ]
       ]
     }
-  ]
+  ],
+  "inbox": "https://survey-inbox.cemetery-surveys.workers.dev",
+  "contact": {
+    "name": "",
+    "email": "",
+    "phone": ""
+  }
 }
