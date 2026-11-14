@@ -41,8 +41,12 @@
   #st-modal .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px}
   #st-modal .chk input{margin-top:4px;width:20px;height:20px;flex:none}
   #st-modal .row{display:flex;gap:8px;margin-top:16px}
-  #st-modal .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #b9b1a3;background:#fff}
-  #st-modal .row button.go{background:var(--accent,#01796F);border-color:var(--accent,#01796F);color:#fff}
+  #st-modal .box,#st-modal .box *{text-shadow:none}
+  #st-modal input,#st-modal textarea,#st-modal select{color:#1f1b16!important;background:#fff!important}
+  #st-modal .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #8a8174!important;background:#fff!important;color:#1f1b16!important;box-shadow:none!important;text-transform:none;letter-spacing:normal}
+  #st-modal .row button.go{background:var(--accent,#01796F)!important;border-color:var(--accent,#01796F)!important;color:#fff!important}
+  #st-modal .row button:disabled{opacity:.55}
+  .st-share{background:#fff!important;color:var(--accent,#01796F)!important;border:1px solid var(--accent,#01796F)!important}
   #st-modal .msg{margin-top:10px;font-size:.95em}
   #st-modal .msg.err{color:#9b1c1c}
   #st-modal .thumb{max-width:120px;border-radius:8px;display:block;margin-top:6px}`;
