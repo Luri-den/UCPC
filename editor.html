@@ -61,7 +61,7 @@ small{color:#6b6258}
   <div class="pane on" id="set">
     <label>Map Name</label><input id="sname">
     <label>Short Name (Mobile)</label><input id="sshort">
-    <label>Cemetery ID Letters (New Cemetery ID System, i.e. FC001)</label><input id="spre" maxlength="6">
+    <label>Cemetery ID Letters (New Cemetery ID System, for example UC001)</label><input id="spre" maxlength="6">
     <h3>Colors</h3><div id="cols"></div>
     <h3>Starting View</h3>
     <small>Zoom and move the map to how you feel visitors should first see it, then press the button.</small>
@@ -147,7 +147,7 @@ const PATHS_DEF = { cemeteries:"photos/", graves:"photos/gravepics/", stories:"p
 function photoDir(k) { const v = String((S && S.paths && S.paths[k]) || PATHS_DEF[k]).trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, ""); return v && !v.split("/").includes("..") ? v + "/" : PATHS_DEF[k]; }
 function photoUrl(path) { const b = String((S && S.paths && S.paths.base) || "").trim(); return !b || /^(https?:|blob:|data:)/.test(path) ? path : b.replace(/\/+$/, "") + "/" + path; }
 function blank() {
-  S = { name:"", shortName:"", idPrefix:"FC", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
+  S = { name:"", shortName:"", idPrefix:"CEM", center:null, zoom:null, colors:Object.assign({}, COLOR_DEF), files:Object.assign({}, FILES_DEF) };
   cems = []; cemF = CEM_DEF.slice(); ints = []; intF = INT_DEF.slice();
   bounds = { type:"FeatureCollection", features:[] }; county = null; sel = null; selG = null; mode = null; dirty.clear(); photos.clear(); hadSettings = false; guide = null;
 }
@@ -563,21 +563,13 @@ map.on("click", e => {
   const r = cem(); r.LAT = +e.lngLat.lat.toFixed(7); r.LONG = +e.lngLat.lng.toFixed(7); touch("cem"); setMode(null);
 });
 
-const LEGACY_OVERLAYS = [
-  { id:"franklin-1882-layer", label:"1882 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/cropped-franklin-1882.jpg", width:3497, height:2926,
-    controlPoints:[[475,850,-85.298653,39.525454],[3105,825,-84.810676,39.521903],[3080,2310,-84.815210,39.309328],[465,2610,-85.299317,39.267088]] },
-  { id:"franklin-1910-layer", label:"1910 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/franklin-1910.jpg", width:11556, height:9198,
-    controlPoints:[[1221,2525,-85.298653,39.525454],[8876,2577,-84.810676,39.521903],[8902,7159,-84.815210,39.309328],[1334,8000,-85.299317,39.267088]] },
-  { id:"franklin-1936-layer", label:"1936 Franklin Co. Map", url:"https://raw.githubusercontent.com/Luri-den/FCPC/main/franklin-1936.jpg", width:12811, height:10791,
-    controlPoints:[[2721,1624,-85.298653,39.525454],[10390,1686,-84.810676,39.521903],[10390,6190,-84.815210,39.309328],[2750,6940,-85.299317,39.267088]] }
-];
 let ov = null;   // the overlay being previewed or positioned
 const blobUrls = new Map();   // preview addresses for pictures not published yet
 function solve3(M, b) {
   const d = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
   const D = d(M); return [0, 1, 2].map(i => d(M.map((r, j) => r.map((v, k) => k === i ? b[j] : v))) / D);
 }
-function fit(o) {   // picture pixel (x, y) -> [lon, lat], a best fit through the control points, like test3 does
+function fit(o) {   // picture pixel (x, y) -> [lon, lat], a best fit through the control points, like the map page does
   const A = [[0,0,0],[0,0,0],[0,0,0]], bl = [0,0,0], bt = [0,0,0];
   o.controlPoints.forEach(([x, y, lon, lat]) => { const v = [x, y, 1]; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) A[i][j] += v[i] * v[j]; bl[i] += v[i] * lon; bt[i] += v[i] * lat; } });
   const L = solve3(A, bl), T = solve3(A, bt);
@@ -774,7 +766,7 @@ async function load(files) {
   tab(cems.length ? "cem" : "set"); drawSet(); refresh();
   if (!guide) guide = { intro:"", sections:[] };
   drawGuide();
-  if (!S.overlays) S.overlays = S.files.county === "franklin-county.geojson" ? JSON.parse(JSON.stringify(LEGACY_OVERLAYS)) : [];   // Franklin's three old maps used to live inside test3
+  if (!S.overlays) S.overlays = [];
   ov = null;
   takeSnap();
   const fixed = fixBlankIds();
@@ -919,10 +911,9 @@ $("#save").onclick = async () => {
 $("#dlBtn").onclick = () => { if (cems.length) outFiles().forEach(([n, t]) => dl(n, t)); };
 window.onbeforeunload = e => { if (dirty.size) { e.preventDefault(); return ""; } };
 // ---------- opening the map files from the site, or straight from the GitHub repository ----------
-const LEGACY_NAMES = { cemeteries:"cemlist.csv", interments:"interments.csv", boundaries:"test-cemetery.geojson", county:"franklin-county.geojson", motifs:"motifs.json" };   // names used before settings.json existed
 async function filesFrom(get) {   // get(name) returns a File, or null when the file doesn't exist
   const set = await get("settings.json");
-  let names = LEGACY_NAMES;
+  let names = FILES_DEF;
   if (set) { try { names = Object.assign({}, FILES_DEF, JSON.parse(await set.text()).files || {}); } catch (e) {} }
   return (await Promise.all([set].concat(Object.values(names).map(get)))).filter(Boolean);
 }
@@ -944,6 +935,7 @@ async function loadFromGitHub() {   // works from a file on your computer, and w
 $("#gopen").onclick = loadFromGitHub;
 loadFromSite();
 </script>
+<script src="media.js"></script>
 <script src="inbox-tab.js"></script>
 <script src="questions-tab.js"></script>
 <script src="publish.js"></script>

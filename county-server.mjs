@@ -15,7 +15,7 @@
 
    Safety:
      - Publishing needs the key. Reading the map does not.
-     - Publish can only write data: .csv .json .geojson and pictures. It can never replace a page or a script.
+     - Publish can only write data: .csv .json .geojson, pictures and short recordings. It can never replace a page or a script.
      - Every file that gets replaced is first copied into .history/<date>/, so nothing is lost.
      - Put it behind HTTPS (IIS, nginx, Caddy or Cloudflare in front). Browsers refuse to send from an
        https page to a plain http server.
@@ -32,9 +32,10 @@ const PORT = +arg("port", process.env.PORT || 8080);
 const KEY = process.env.PUBLISH_KEY || "";
 const ORIGIN = process.env.ALLOW_ORIGIN || "*";          // set to the editor's address to allow only that site to publish
 const MAX = (+process.env.MAX_MB || 30) * 1048576;       // biggest single file
-const WRITABLE = new Set(["csv", "json", "geojson", "jpg", "jpeg", "png", "webp", "gif"]);
+const WRITABLE = new Set(["csv", "json", "geojson", "jpg", "jpeg", "png", "webp", "gif", "mp3", "m4a", "aac", "ogg", "webm"]);   // data, pictures, and short recordings sent with stories
 const TYPES = { html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", mjs: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8",
   json: "application/json; charset=utf-8", geojson: "application/geo+json; charset=utf-8", csv: "text/csv; charset=utf-8", txt: "text/plain; charset=utf-8",
+  mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", ogg: "audio/ogg", webm: "audio/webm",
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon", webmanifest: "application/manifest+json" };
 
 if (KEY.length < 16) { console.error("Set PUBLISH_KEY to a secret at least 16 characters long before starting."); process.exit(1); }

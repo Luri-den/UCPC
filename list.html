@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#01796F">
-<title>Cemetery and People Lists | Franklin County Indiana Pioneer Cemeteries Archive Prototype</title>
+<title>Cemetery and People Lists</title>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
@@ -149,7 +149,7 @@
 
 <header>
     <h1>Cemetery and People Lists</h1>
-    <p>Franklin County Indiana Pioneer Cemeteries Archive Prototype &middot; <a href="#" id="back-link">&larr; Back to the Map</a></p>
+    <p><span id="site-name">Cemetery Map</span> &middot; <a href="#" id="back-link">&larr; Back to the Map</a></p>
 </header>
 
 <main>
@@ -200,10 +200,29 @@
 
 // The map page this list links to. Change this if the map page is renamed
 // (for example to index.html).
-const MAP_PAGE = "test2.html";
+const MAP_PAGE = "index.html";
 
-const CEMETERY_CSV = "cemlist.csv";
-const INTERMENT_CSV = "interments.csv";
+const SET = (function () {   // settings.json, written by the editor. A copy is kept on this device for when there is no signal.
+    const KEEP = "settings-copy:" + new URL("settings.json", document.baseURI).pathname;
+    try {
+        const x = new XMLHttpRequest();
+        x.open("GET", new URL("settings.json", document.baseURI).href, false);
+        x.send();
+        if (x.status === 200) { const j = JSON.parse(x.responseText); try { localStorage.setItem(KEEP, x.responseText); } catch (e) {} return j; }
+    } catch (e) { /* offline, or no settings file */ }
+    try { const t = localStorage.getItem(KEEP); if (t) { return JSON.parse(t); } } catch (e) {}
+    return {};
+})();
+const SET_FILES = Object.assign({ cemeteries: "cemlist.csv", interments: "interments.csv" }, SET.files || {});
+const SET_PATHS = (function () {
+    const d = { cemeteries: "photos/", graves: "photos/gravepics/", base: "" }, p = SET.paths || {}, o = {};
+    ["cemeteries", "graves"].forEach(function (k) { const v = String(p[k] || d[k]).trim().replace(/^\/+/, "").replace(/\/+$/, ""); o[k] = v && v.split("/").indexOf("..") < 0 ? v + "/" : d[k]; });
+    o.base = String(p.base || "").trim().replace(/\/+$/, ""); if (o.base) { o.base += "/"; }
+    return o;
+})();
+const CEMETERY_CSV = SET_FILES.cemeteries;
+const INTERMENT_CSV = SET_FILES.interments;
+if (SET.name) { document.title = "Cemetery and People Lists | " + SET.name; document.getElementById("site-name").textContent = SET.name; }
 
 const PEOPLE_PAGE_SIZE = 250;
 
@@ -818,6 +837,10 @@ loadCsv(CEMETERY_CSV)
         peopleMessage.textContent = "Unable to load the records.";
     });
 
+</script>
+<script>
+// Offline: sw.js keeps a copy of this page and its data so it opens with no signal
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
 </script>
 </body>
 </html>

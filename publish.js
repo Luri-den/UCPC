@@ -20,7 +20,7 @@
 (function () {
   "use strict";
 
-  const DEFAULTS = { target: "github", owner: "Luri-den", repo: "FCPC", branch: "", serverUrl: "" };   // blank branch = the repo's default
+  const DEFAULTS = { target: "github", owner: "", repo: "", branch: "", serverUrl: "" };   // blank branch = the repo's default
   const SKEY = "ghpublish.cemetery.settings.v1", TKEY = "ghpublish.cemetery.token.v1";
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -99,7 +99,7 @@
   // The branch tip as of when this editor page opened, so we can tell if someone else changed files since
   let baseSha = null;
   const baseReady = (async () => {
-    if (isServer()) return;
+    if (isServer() || !configured()) return;
     try { baseSha = (await api("/git/ref/heads/" + await branchName())).object.sha; } catch (e) {}
   })();
 

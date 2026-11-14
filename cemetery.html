@@ -496,16 +496,35 @@ a {
 // CSV FILE LOCATIONS
 // ============================================================
 
+const SET = (function () {   // settings.json, written by the editor. A copy is kept on this device for when there is no signal.
+    const KEEP = "settings-copy:" + new URL("settings.json", document.baseURI).pathname;
+    try {
+        const x = new XMLHttpRequest();
+        x.open("GET", new URL("settings.json", document.baseURI).href, false);
+        x.send();
+        if (x.status === 200) { const j = JSON.parse(x.responseText); try { localStorage.setItem(KEEP, x.responseText); } catch (e) {} return j; }
+    } catch (e) { /* offline, or no settings file */ }
+    try { const t = localStorage.getItem(KEEP); if (t) { return JSON.parse(t); } } catch (e) {}
+    return {};
+})();
+const SET_FILES = Object.assign({ cemeteries: "cemlist.csv", interments: "interments.csv" }, SET.files || {});
+const SET_PATHS = (function () {
+    const d = { cemeteries: "photos/", graves: "photos/gravepics/", base: "" }, p = SET.paths || {}, o = {};
+    ["cemeteries", "graves"].forEach(function (k) { const v = String(p[k] || d[k]).trim().replace(/^\/+/, "").replace(/\/+$/, ""); o[k] = v && v.split("/").indexOf("..") < 0 ? v + "/" : d[k]; });
+    o.base = String(p.base || "").trim().replace(/\/+$/, ""); if (o.base) { o.base += "/"; }
+    return o;
+})();
+
 const CEMETERY_CSV_PATH =
     new URL(
-        "cemlist.csv",
+        SET_FILES.cemeteries,
         document.baseURI
     ).href;
 
 
 const INTERMENTS_CSV_PATH =
     new URL(
-        "interments.csv",
+        SET_FILES.interments,
         document.baseURI
     ).href;
 
@@ -797,7 +816,7 @@ for (let i = 0; i <= 5; i++) {
         function(ext) {
 
             photoPaths.push(
-                `photos/${encodeURIComponent(cemeteryID)}${suffix}.${ext}`
+                `${SET_PATHS.base}${SET_PATHS.cemeteries}${encodeURIComponent(cemeteryID)}${suffix}.${ext}`
             );
 
         }
@@ -1146,7 +1165,7 @@ function displayInterments(
 
                 const gravePhoto =
                     markerID
-                        ? `photos/gravepics/${encodeURIComponent(markerID)}-1.jpg`
+                        ? `${SET_PATHS.base}${SET_PATHS.graves}${encodeURIComponent(markerID)}-1.jpg`
                         : "";
                 // ------------------------------------------------
                 // NAME
@@ -1535,6 +1554,10 @@ function displayInterments(
 
 </script>
 
+<script>
+// Offline: sw.js keeps a copy of this page and its data so it opens with no signal
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+</script>
 </body>
 
 </html>

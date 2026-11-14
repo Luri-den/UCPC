@@ -1,12 +1,13 @@
 /* stories.js - "Stories and memories" on the grave and cemetery cards, and the "Share a story" form.
-   Loaded by test3.html after its own script. It does not change the map; it only adds to the cards.
+   Loaded by the map page (index.html) after its own script. It does not change the map; it only adds to the cards.
 
    - Approved stories come from stories.csv (or settings.json files.stories). Columns:
        STORY_ID, TARGET_TYPE (marker | cemetery), TARGET_ID, CEMETERY_ID, PERSON, TEXT, QUOTE, TOLD_BY, CONNECTION,
-       DATE_TOLD, TAG (Family account | Personal memory | Documented), SOURCE, PHOTO
+       DATE_TOLD, TAG (Family account | Personal memory | Documented), SOURCE, PHOTO,
+       MEDIA (video or audio: links or files, separated by " | "; see media.js)
      The editor writes this file when the lead approves a story. A missing file just means no stories yet.
    - Shared stories go to the county inbox (settings.json "inbox") and wait there for the lead.
-   - test3.html tells this file what a card shows by setting infoContent.dataset.storyFor just before it draws the card. */
+   - The map page tells this file what a card shows by setting infoContent.dataset.storyFor just before it draws the card. */
 (function () {
   "use strict";
   if (typeof infoContent === "undefined") return;
@@ -198,6 +199,7 @@
       h += '<div class="st-item">' + (s.PERSON && t.type === "marker" ? '<div class="st-meta"><b>About ' + H(s.PERSON) + "</b></div>" : "") +
         "<p>" + H(s.TEXT) + "</p>" +
         (s.PHOTO ? '<img src="' + H(typeof photoUrl === "function" ? photoUrl(s.PHOTO) : s.PHOTO) + '" alt="Photo shared with this story" loading="lazy">' : "") +
+        (s.MEDIA && window.StoryMedia ? StoryMedia.html(s.MEDIA) : "") +
         '<div class="st-meta">' + (who ? "Shared by " + H(who) : "Shared anonymously") + (s.DATE_TOLD ? " · " + H(s.DATE_TOLD) : "") +
         (s.TAG ? '<span class="st-tag">' + H(s.TAG) + "</span>" : "") + (s.SOURCE ? "<br>Source: " + H(s.SOURCE) : "") + "</div></div>";
     });
@@ -239,6 +241,8 @@
     <label for="st-conn">Your connection</label><input type="text" id="st-conn" maxlength="120" placeholder="Great-granddaughter, neighbor, historian…">
     <label for="st-teller">Who told it, if not you</label><input type="text" id="st-teller" maxlength="120">
     <label for="st-photo">A photo (optional)</label><input type="file" id="st-photo" accept="image/*"><img id="st-thumb" class="thumb" alt="" hidden>
+    <label for="st-audio">A recording (optional)</label><input type="file" id="st-audio" accept="audio/*"><p class="hint" id="st-audiohint">A short voice recording, up to about 2 minutes. For anything longer, or for video, use the link box below.</p>
+    <label for="st-link">A link to a video or recording (optional)</label><input type="text" id="st-link" maxlength="300" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…"><p class="hint">YouTube, Vimeo, or a link to an audio or video file.</p>
     <label for="st-contact">Email or phone (optional)</label><input type="text" id="st-contact" maxlength="160" autocomplete="email"><p class="hint">Only the county's reviewer sees this, in case they have a question. It is never shown.</p>
     <label class="chk"><input type="checkbox" id="st-consent"><span>I have the right to share this, including permission from anyone recorded or quoted, and I agree it may be shown on this site and kept in the county archive.</span></label>
     <p class="hint">A volunteer reviews every story before it appears. Stories about living people, or with private details, may be kept in the archive without being shown.</p>
@@ -246,7 +250,18 @@
     <div class="msg" id="st-msg" role="status" aria-live="polite"></div></div>`;
   document.body.append(modal);
   const $ = id => document.getElementById(id);
-  let target = null, photoData = null, lastFocus = null;
+  let target = null, photoData = null, audioData = null, lastFocus = null;
+  const AUDIO_OK = /^audio\/(webm|mp4|mpeg|ogg|aac|x-m4a)$/, AUDIO_MAX = 1400000;   // what the inbox accepts
+  $("st-audio").addEventListener("change", function () {
+    const f = this.files && this.files[0]; audioData = null; if (!f) return;
+    const mime = String(f.type || "").split(";")[0].toLowerCase();
+    if (!AUDIO_OK.test(mime)) { this.value = ""; return say("That kind of recording can't be sent here. Try an .mp3 or .m4a file, or put it online and paste the link below.", true); }
+    if (f.size > AUDIO_MAX) { this.value = ""; return say("That recording is too long to send here (the limit is about 2 minutes). Put it on YouTube or another site and paste the link below.", true); }
+    const r = new FileReader();
+    r.onload = function () { const m = /^data:[^,]*;base64,(.*)$/.exec(String(r.result)); if (m) { audioData = { mime: mime, data: m[1] }; say(""); } };
+    r.onerror = function () { say("That recording couldn't be read.", true); };
+    r.readAsDataURL(f);
+  });
 
   $("st-type").addEventListener("change", function () { $("st-srcwrap").hidden = !/^Documented/.test(this.value); });
   $("st-cancel").addEventListener("click", closeForm);
@@ -275,28 +290,30 @@
   function say(t, err) { const m = $("st-msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); }
   function draftKey() { return "story-draft:" + AREA + ":" + (target ? target.type + ":" + target.id : ""); }
   function openForm(t) {
-    target = t; lastFocus = document.activeElement; photoData = null;
+    target = t; lastFocus = document.activeElement; photoData = null; audioData = null; $("st-audio").value = "";
     $("st-about").textContent = "About: " + (t.label || t.id);
     let d = {}; try { d = JSON.parse(localStorage.getItem(draftKey()) || "{}"); } catch (e) {}
     $("st-text").value = d.text || ""; $("st-name").value = d.name || ""; $("st-conn").value = d.connection || ""; $("st-teller").value = d.teller || "";
-    $("st-contact").value = d.contact || ""; $("st-src").value = d.source || ""; $("st-consent").checked = false; $("st-photo").value = ""; $("st-thumb").hidden = true;
+    $("st-contact").value = d.contact || ""; $("st-src").value = d.source || ""; $("st-link").value = d.link || ""; $("st-consent").checked = false; $("st-photo").value = ""; $("st-thumb").hidden = true;
     $("st-type").value = d.type || "Family story"; $("st-srcwrap").hidden = !/^Documented/.test($("st-type").value);
     $("st-send").disabled = false; say("");
     modal.hidden = false; $("st-text").focus();
   }
   function closeForm() { saveDraft(); modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
-  function fields() { return { text: $("st-text").value.trim(), type: $("st-type").value, source: $("st-src").value.trim(), name: $("st-name").value.trim(), connection: $("st-conn").value.trim(), teller: $("st-teller").value.trim(), contact: $("st-contact").value.trim() }; }
+  function fields() { return { text: $("st-text").value.trim(), type: $("st-type").value, source: $("st-src").value.trim(), name: $("st-name").value.trim(), connection: $("st-conn").value.trim(), teller: $("st-teller").value.trim(), link: $("st-link").value.trim(), contact: $("st-contact").value.trim() }; }
   function saveDraft() { try { const f = fields(); if (f.text) localStorage.setItem(draftKey(), JSON.stringify(f)); } catch (e) {} }
-  ["st-text", "st-name", "st-conn", "st-teller", "st-contact", "st-src"].forEach(id => $(id).addEventListener("input", saveDraft));
+  ["st-text", "st-name", "st-conn", "st-teller", "st-contact", "st-src", "st-link"].forEach(id => $(id).addEventListener("input", saveDraft));
 
   $("st-send").addEventListener("click", async function () {
     const f = fields();
     if (!f.text) { say("Please write the story or memory first.", true); $("st-text").focus(); return; }
+    if (f.link && window.StoryMedia) { const c = StoryMedia.check(f.link); if (c.bad.length || !c.ok.length) { say("That link doesn't look right. It should start with https://, like a YouTube address.", true); $("st-link").focus(); return; } }
     if (!$("st-consent").checked) { say("Please tick the permission box.", true); $("st-consent").focus(); return; }
     if (!navigator.onLine) { saveDraft(); say("You're offline. Your story is saved on this device. Open this form again when you have signal and press Send.", true); return; }
     const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
     const media = [], data = Object.assign({}, f, { consent: true, cemetery: target.cemetery || (target.type === "cemetery" ? target.id : ""), person: target.person || "", label: target.label || "", page: location.href.split("?")[0] });
     if (photoData) { const m = /^data:([^;]+);base64,(.*)$/.exec(photoData); if (m) { media.push({ mime: m[1], data: m[2] }); data.photo = "media:0"; } }
+    if (audioData) { media.push(audioData); data.audio = "media:" + (media.length - 1); }
     $("st-send").disabled = true; say("Sending…");
     try {
       const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: target.type, id: target.id }, data, media, created: new Date().toISOString(), submitter: f.name }) });

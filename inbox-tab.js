@@ -26,7 +26,7 @@
   const COND = { "Well kept": "3", "Fair": "2", "Poor": "1", "Overgrown": "1", "Hard to find / lost": "0" };
   const EDITOR_FENCES = ["Stone", "Wire", "Cast Iron", "Aluminum / Vinyl", "Pipe", "Chain Link"];
   const EDITOR_HAZ = ["Unstable / Uneven Ground", "Steep Slope(s)", "Heavy Brush / Roots", "Livestock / Animals", "Poison Ivy / Oak", "Fallen / Broken Stones", "Open / Damaged Vault", "Frequent Flooding / Mud"];
-  const STORY_COLS = ["STORY_ID", "TARGET_TYPE", "TARGET_ID", "CEMETERY_ID", "PERSON", "TEXT", "QUOTE", "TOLD_BY", "CONNECTION", "DATE_TOLD", "TAG", "SOURCE", "PHOTO"];
+  const STORY_COLS = ["STORY_ID", "TARGET_TYPE", "TARGET_ID", "CEMETERY_ID", "PERSON", "TEXT", "QUOTE", "TOLD_BY", "CONNECTION", "DATE_TOLD", "TAG", "SOURCE", "PHOTO", "MEDIA"];
   const VISIT_COLS = ["VISIT_ID", "DATE", "CEMETERY_ID", "TARGET_TYPE", "TARGET_ID", "SURVEYOR", "SUMMARY", "DATA"];
 
   let items = [], current = null, filter = "all", lastCheck = null, invites = null, lastError = "";
@@ -308,7 +308,24 @@
         el("label", { textContent: "Shared by" }), who, el("label", { textContent: "Connection" }), conn, el("label", { textContent: "Source" }), src);
       if (d.teller && d.name) box.append(el("small", { textContent: "Told by " + d.teller + ", sent in by " + d.name + "." }));
       if (d.contact) box.append(el("div", { className: "box", style: "background:#f3f0e8" }, [el("small", { textContent: "Private contact (never published): " + d.contact })]));
-      storyEdit = { t, q, tag, who, conn, src };
+      // video and audio: a link the sharer pasted (the reviewer can fix or add one), and a recording they sent
+      const link = el("input", { value: d.link || "", placeholder: "https://www.youtube.com/watch?v=…" }), prev = el("div"), note = el("small");
+      const showLink = () => {
+        const c = window.StoryMedia ? StoryMedia.check(link.value) : { ok: [], bad: [] };
+        prev.innerHTML = window.StoryMedia ? StoryMedia.html(link.value) : "";
+        note.textContent = c.bad.length ? "This can't be published as it is (it must start with https://): " + c.bad.join(", ") : c.ok.length ? "Play it here and check it before approving. Visitors see the same thing." : "";
+        note.style.color = c.bad.length ? "#a33" : "";
+      };
+      link.oninput = showLink; showLink();
+      box.append(el("label", { textContent: "Video or Audio Link (YouTube, Vimeo, or a file)" }), link, prev, note);
+      let audioKeep = null;
+      if (d.audio) {
+        const player = el("audio", { controls: true, preload: "none", style: "width:100%;display:block;margin:4px 0" });
+        mediaUrl(it, d.audio).then(u => { if (u) player.src = u; }).catch(() => {});
+        audioKeep = el("input", { type: "checkbox", checked: true });
+        box.append(el("label", { textContent: "Recording Sent With the Story" }), player, el("label", { style: "font-weight:normal;text-transform:none;letter-spacing:0;font-size:13px" }, [audioKeep, " Publish this recording with the story (listen to all of it first)"]));
+      }
+      storyEdit = { t, q, tag, who, conn, src, link, audioKeep };
       if (refs.length) opt("pics", "Publish the ticked photo with the story");
     }
 
@@ -337,9 +354,20 @@
         if (!(await loadExtra("stories"))) return;
         let photoPath = "";
         if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photoPath = photoDir("stories") + it.id + ".jpg"; photos.set(photoPath, b); touch("photos"); } }
+        const mediaList = [];
+        if (storyEdit.link.value.trim()) {
+          const chk = window.StoryMedia ? StoryMedia.check(storyEdit.link.value) : { ok: [1], bad: [] };
+          if (chk.bad.length) return say("Fix or clear the video or audio link first. It must start with https://");
+          mediaList.push(storyEdit.link.value.trim());
+        }
+        if (d.audio && storyEdit.audioKeep && storyEdit.audioKeep.checked) {
+          const b = await mediaBlob(it, d.audio), n = +String(d.audio).split(":")[1], mime = ((it.media || [])[n] || {}).mime || (b && b.type) || "";
+          const ext = ({ "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/ogg": "ogg", "audio/webm": "webm" })[mime.split(";")[0]] || "m4a";
+          if (b) { const p = photoDir("stories") + it.id + "-audio." + ext; photos.set(p, b); touch("photos"); mediaList.push(p); }
+        }
         extra.stories.rows.push({ _new: true, STORY_ID: it.id, TARGET_TYPE: it.target_type || "marker", TARGET_ID: it.target_id || "", CEMETERY_ID: d.cemetery || "", PERSON: d.person || "",
           TEXT: storyEdit.t.value.trim(), QUOTE: storyEdit.q.value.trim(), TOLD_BY: storyEdit.who.value.trim(), CONNECTION: storyEdit.conn.value.trim(),
-          DATE_TOLD: String(it.received || it.created || "").slice(0, 10), TAG: storyEdit.tag.value, SOURCE: storyEdit.src.value.trim(), PHOTO: photoPath });
+          DATE_TOLD: String(it.received || it.created || "").slice(0, 10), TAG: storyEdit.tag.value, SOURCE: storyEdit.src.value.trim(), PHOTO: photoPath, MEDIA: mediaList.join(" | ") });
         touch("stories");
       } else {
         if (!(await loadExtra("visits"))) return;

@@ -107,7 +107,7 @@ const r6 = n => Math.round(n * 1e6) / 1e6;
 let toastTimer = 0;
 function toast(msg, ms) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), ms || 2800); }
 
-const DEFAULT_INBOX = "https://survey-inbox.cemetery-surveys.workers.dev";
+const DEFAULT_INBOX = "";   // the inbox address comes from settings.json ("inbox")
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 
 const NODES = { map: $("map"), banner: $("mapBanner"), bannerText: $("mapBannerText"), cancel: $("mapBannerCancel"), base: $("baseBtn") };
@@ -181,7 +181,7 @@ function showNoInvite() {
   $("main").innerHTML = '<div class="card"><h2>Would you like to help survey?</h2><p>Surveys are done by invited volunteers so every record can be checked. To get an invite, contact ' + contactLine() + ".</p>" +
     '<p class="muted">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears. Or type the code from your invite link:</p>' +
     '<input type="text" id="codeIn" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD" aria-label="Invite code"><button type="button" class="primary big" id="codeGo">Sign in</button><p id="codeMsg" class="err" role="status"></p>' +
-    '<p><a href="test3.html">Back to the map</a></p></div>';
+    '<p><a href="index.html">Back to the map</a></p></div>';
   $("codeGo").onclick = async () => {
     const code = $("codeIn").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = $("codeMsg");
     if (!code) { m.textContent = "Type your invite code."; return; }
@@ -685,6 +685,10 @@ async function exportUnsent() {
 }
 
 boot();
+</script>
+<script>
+// Offline: sw.js keeps a copy of this page and its data so it opens with no signal
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
 </script>
 </body>
 </html>
