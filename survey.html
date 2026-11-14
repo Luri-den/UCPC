@@ -179,7 +179,7 @@ function contactLine() {
 function showNoInvite() {
   $("homeBtn").classList.add("hidden"); bar([]);
   $("main").innerHTML = '<div class="card"><h2>Would you like to help survey?</h2><p>Surveys are done by invited volunteers so every record can be checked. To get an invite, contact ' + contactLine() + ".</p>" +
-    '<p class="muted">Already have an invite? Open the link on this phone, or type the code:</p>' +
+    '<p class="muted">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears. Or type the code from your invite link:</p>' +
     '<input type="text" id="codeIn" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD" aria-label="Invite code"><button type="button" class="primary big" id="codeGo">Sign in</button><p id="codeMsg" class="err" role="status"></p>' +
     '<p><a href="test3.html">Back to the map</a></p></div>';
   $("codeGo").onclick = async () => {

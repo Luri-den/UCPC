@@ -128,7 +128,7 @@
     const inv = invite(), lead = store.get(leadKeyName);
     const v = section(si.querySelector("#si-vol"), inv
       ? '<h3>Surveyor</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
-      : '<h3>Surveyor</h3><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">It\'s in the invite link your county lead sent you (after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
+      : '<h3>Surveyor</h3><p class="hint">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears.</p><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">Or type the code from your invite link (the part after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
     if (inv) { v("si-go").onclick = () => { location.href = "survey.html"; }; v("si-out").onclick = () => { if (confirm("Sign out of surveying on this device? Surveys not yet sent stay saved on it.")) { store.set(inviteKey, ""); drawSignIn(); menu(); } }; }
     else v("si-in").onclick = async () => {
       const code = v("si-code").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = v("si-vmsg");
