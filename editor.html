@@ -55,7 +55,7 @@ small{color:#6b6258}
     <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
   </div>
-  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button></div>
+  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button><button data-t="inb">New</button></div>
 
   <div class="pane on" id="set">
     <label>Map Name</label><input id="sname">
@@ -94,6 +94,8 @@ small{color:#6b6258}
   <div class="pane" id="grv"><div id="gdet"></div></div>
 
   <div class="pane" id="gui"></div>
+
+  <div class="pane" id="inb"></div>
 </aside>
 <div id="map"><div id="hint" hidden></div><button id="bm">Street Map</button></div>
 <input type="file" id="gfile" accept=".json" hidden>
@@ -935,6 +937,7 @@ async function loadFromGitHub() {   // works from a file on your computer, and w
 $("#gopen").onclick = loadFromGitHub;
 loadFromSite();
 </script>
+<script src="inbox-tab.js"></script>
 <script src="publish.js"></script>
 <script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 </body>
