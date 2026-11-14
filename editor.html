@@ -15,8 +15,8 @@ aside{width:350px;max-width:45vw;display:flex;flex-direction:column;border-right
 .top{padding:10px;background:#01796F;color:#fff}
 .top button{margin:0 4px 4px 0}
 #msg{font-size:12px;min-height:16px}
-.tabs{display:flex}
-.tabs button{flex:1;padding:10px;border:0;border-bottom:3px solid transparent;background:#eee9dc;font-weight:bold;cursor:pointer}
+.tabs{display:flex;flex-wrap:wrap}
+.tabs button{flex:1 0 auto;padding:10px 4px;font-size:13px;border:0;border-bottom:3px solid transparent;background:#eee9dc;font-weight:bold;cursor:pointer}
 .tabs button.on{border-color:#01796F;background:#fff}
 .pane{display:none;padding:10px;overflow:auto;flex:1}
 .pane.on{display:block}
@@ -55,7 +55,7 @@ small{color:#6b6258}
     <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
   </div>
-  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button><button data-t="inb">New</button></div>
+  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button><button data-t="qst">Survey</button><button data-t="inb">New</button></div>
 
   <div class="pane on" id="set">
     <label>Map Name</label><input id="sname">
@@ -94,6 +94,8 @@ small{color:#6b6258}
   <div class="pane" id="grv"><div id="gdet"></div></div>
 
   <div class="pane" id="gui"></div>
+
+  <div class="pane" id="qst"></div>
 
   <div class="pane" id="inb"></div>
 </aside>
@@ -938,6 +940,7 @@ $("#gopen").onclick = loadFromGitHub;
 loadFromSite();
 </script>
 <script src="inbox-tab.js"></script>
+<script src="questions-tab.js"></script>
 <script src="publish.js"></script>
 <script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 </body>
