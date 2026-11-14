@@ -73,6 +73,11 @@ details.more summary{min-height:48px;display:flex;align-items:center;font-weight
 #toast.on{opacity:1}
 .hidden{display:none!important}
 .coord{font-size:14px;color:var(--muted)}
+.vtx{width:22px;height:22px;background:#facc15;border:3px solid #1f1b16;border-radius:4px;touch-action:none}
+.vtx.rm{background:#ef4444}
+.mid{width:16px;height:16px;border-radius:50%;background:#ffffffcc;border:2px solid #1f1b16}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#22c55e;border:3px solid #1f1b16;touch-action:none}
+.pin.moved{background:#f97316}
 </style>
 </head>
 <body>
@@ -339,6 +344,18 @@ function tapMap(text, cb) { tapCb = cb; NODES.bannerText.textContent = text; NOD
 function clearTap() { tapCb = null; NODES.banner.classList.remove("on"); if (map) map.getCanvas().style.cursor = ""; }
 function stopMapModes() { const h = cancelHook; cancelHook = null; clearTap(); NODES.cancel.textContent = "Cancel"; if (h) h(); }
 
+/* draggable handles on the map (boundary corners, the marker's own pin). Cleared whenever a form is redrawn. */
+let handles = [];
+function clearHandles() { handles.forEach(m => m.remove()); handles = []; }
+function handle(ll, cls, opts) {
+  const d = document.createElement("div"); d.className = cls;
+  if (opts.label) d.setAttribute("aria-label", opts.label);
+  const mk = new maplibregl.Marker({ element: d, draggable: !!opts.drag }).setLngLat(ll).addTo(map);
+  if (opts.drag) mk.on("dragend", () => { const p = mk.getLngLat(); opts.drag([r6(p.lng), r6(p.lat)]); });
+  if (opts.click) d.addEventListener("click", ev => { ev.stopPropagation(); opts.click(); });
+  handles.push(mk); return mk;
+}
+
 /* GPS: one careful reading. Waits up to 20 s for a good fix and keeps the best one. */
 function locate() {
   return new Promise((ok, bad) => {
@@ -354,7 +371,7 @@ function locate() {
     const t = setTimeout(finish, 20000);
   });
 }
-const accText = g => g ? (g.how === "gps" ? "GPS, about " + Math.round(g.acc * 3.28084) + " ft accuracy" + (g.acc > 15 ? " (weak: try again in the open, or tap the map)" : "") : g.how === "existing" ? "Existing marker" : "Placed on the map") : "";
+const accText = g => g ? (g.how === "gps" ? "GPS, about " + Math.round(g.acc * 3.28084) + " ft accuracy" + (g.acc > 15 ? " (weak: try again in the open, or tap the map)" : "") : g.how === "existing" ? "Where the map has it" : g.how === "moved" ? "Moved on the map" : "Placed on the map") : "";
 
 /* ---------------- entries ---------------- */
 async function newEntry(kind, target, where, stone) {
@@ -383,6 +400,7 @@ function visible(q, a) {
 const optionsOf = q => q.options || (q.optionsFrom && Q[q.optionsFrom]) || [];
 
 function renderForm(e) {
+  clearHandles();
   const m = $("main"), qs = Q.questions.filter(q => q.for === e.kind || q.for === "both");
   let box = $("formBox"); if (box) box.remove();
   box = el("div", { id: "formBox" });
@@ -390,7 +408,11 @@ function renderForm(e) {
     el("h2", { text: e.kind === "cemetery" ? "Cemetery details" : (e.target.type === "marker" ? "Existing marker" : "New marker or find") }),
     el("p", { class: "muted", text: current.name + (e.stoneNames && e.stoneNames.length ? " · on record: " + e.stoneNames.join(", ") : "") }),
     e.where ? el("p", { class: "coord", text: accText(e.where) }) : null,
-    e.kind === "marker" && e.target.type === "new" ? el("button", { type: "button", class: "small", text: "Move this point", onclick: () => tapMap("Tap the new spot.", async ll => { e.where = { ll, acc: null, how: "map" }; await save(e); renderForm(e); refreshStones(); }) }) : null
+    e.kind === "marker" && e.where ? el("div", { class: "row" }, [
+      el("button", { type: "button", class: "small", text: e.target.type === "new" ? "Move this point" : "Move this marker", onclick: () => tapMap("Tap where it really is. You can also drag the pin.", ll => movePoint(e, ll)) }),
+      e.moved ? el("button", { type: "button", class: "small", text: "Put it back", onclick: () => movePoint(e, e.moved.from, true) }) : null
+    ]) : null,
+    e.moved ? el("p", { class: "coord", style: "color:#9a3412", text: "Moved " + miles(dist(e.moved.from, e.where.ll)) + " from where the map had it. The reviewer will see both spots." }) : null
   ]);
   box.append(head);
   const core = el("div", { class: "card" }), more = el("details", { class: "more" }, [el("summary", { text: "Add more detail (optional)" })]);
@@ -401,11 +423,24 @@ function renderForm(e) {
   if (moreBody.childNodes.length) { more.append(moreBody); core.append(more); }
   box.append(core);
   m.append(box);
-  if (e.kind === "cemetery") drawCemDraft(e); else setDraft(e.where ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: e.where.ll } }] : []);
+  if (e.kind === "cemetery") drawCemDraft(e);
+  else {
+    setDraft(e.moved ? [{ type: "Feature", properties: { color: "#9ca3af" }, geometry: { type: "Point", coordinates: e.moved.from } }] : []);
+    if (e.where) handle(e.where.ll, "pin" + (e.moved ? " moved" : ""), { label: "This marker. Drag to move it.", drag: ll => movePoint(e, ll) });
+  }
   bar([
     el("button", { type: "button", class: "danger", text: "Delete", onclick: async () => { if (!confirm("Delete this survey from the phone?")) return; await DB.del(e.id); toast("Deleted."); current ? startVisit(current) : showHome(); } }),
     el("button", { type: "button", class: "primary", text: "Save", onclick: () => finish(e) })
   ]);
+}
+/* moving a marker: a new one just moves; an existing one remembers where the map had it, so the reviewer can compare */
+async function movePoint(e, ll, back) {
+  if (e.target.type === "marker") {
+    if (!e.moved) e.moved = { from: e.where.ll.slice() };
+    if (back || dist(e.moved.from, ll) < 0.3) { e.where = { ll: e.moved.from, acc: null, how: "existing" }; delete e.moved; }
+    else e.where = { ll, acc: null, how: "moved" };
+  } else e.where = { ll, acc: null, how: "map" };
+  await save(e); const y = window.scrollY; renderForm(e); window.scrollTo(0, y); refreshStones();
 }
 async function save(e) { e.updated = new Date().toISOString(); await DB.put(e); }
 let saveTimer = 0;
@@ -501,9 +536,28 @@ function photoInput(q, e, set) {
 }
 
 /* boundary: walk the corners with GPS, or tap them on the aerial map */
+function currentBoundary(cid) {
+  const f = BOUNDS.features.find(x => x.properties && String(x.properties.CEMETERY_ID) === cid && x.geometry && x.geometry.type === "Polygon");
+  if (!f) return null;
+  const ring = f.geometry.coordinates[0].slice(), a = ring[0], z = ring[ring.length - 1];
+  if (ring.length > 1 && a[0] === z[0] && a[1] === z[1]) ring.pop();
+  return ring;
+}
 function polygonInput(q, e, set) {
   const pts = (e.answers[q.id] || []).slice(), box = el("div");
-  const add = p => { pts.push(p); set(pts.slice(), false); drawCemDraft(e); refresh(); };
+  let removing = false;
+  const commit = () => { set(pts.length ? pts.slice() : null, false); if (!pts.length) delete e.answers.boundary_source; drawCemDraft(e); refresh(); drawHandles(); };
+  const add = p => { if (!e.answers.boundary_source) e.answers.boundary_source = "new"; pts.push(p); commit(); };
+  const drawHandles = () => {
+    clearHandles();
+    pts.forEach((p, i) => handle(p.ll, "vtx" + (removing ? " rm" : ""), { label: "Corner " + (i + 1), drag: removing ? null : ll => { pts[i] = { ll, acc: null, how: "moved" }; commit(); }, click: removing ? () => { pts.splice(i, 1); commit(); } : null }));
+    if (!removing && pts.length >= 2) pts.forEach((p, i) => { const n = pts[(i + 1) % pts.length]; if (i === pts.length - 1 && pts.length < 3) return;
+      handle([r6((p.ll[0] + n.ll[0]) / 2), r6((p.ll[1] + n.ll[1]) / 2)], "mid", { label: "Add a corner here", click: () => { pts.splice(i + 1, 0, { ll: [r6((p.ll[0] + n.ll[0]) / 2), r6((p.ll[1] + n.ll[1]) / 2)], acc: null, how: "map" }); commit(); } }); });
+  };
+  const existing = currentBoundary(current.id);
+  if (existing && !pts.length) box.append(el("button", { type: "button", class: "primary big", text: "Fix the current boundary", onclick: () => {
+    existing.forEach(ll => pts.push({ ll: ll.slice(), acc: null, how: "existing" })); e.answers.boundary_source = "edited"; commit(); toast("Drag the yellow corners. Tap a small dot to add a corner between two.", 4000); } }),
+    el("p", { class: "help", text: "Or start fresh below." }));
   const info = el("p", { class: "coord" });
   const refresh = () => { info.textContent = pts.length ? pts.length + " corner" + (pts.length === 1 ? "" : "s") + (pts.length >= 3 ? " · closed shape" : " · need at least 3") : "No corners yet."; };
   let drawing = false;
@@ -516,9 +570,10 @@ function polygonInput(q, e, set) {
     drawBtn
   ]), info, el("div", { class: "row" }, [
     el("button", { type: "button", class: "small", text: "Undo last corner", onclick: () => { pts.pop(); set(pts.slice(), false); drawCemDraft(e); refresh(); } }),
-    el("button", { type: "button", class: "small danger", text: "Clear", onclick: () => { if (!pts.length || confirm("Clear all corners?")) { pts.length = 0; set(null, false); drawCemDraft(e); refresh(); } } })
-  ]));
-  refresh();
+    el("button", { type: "button", class: "small", text: "Remove corners", onclick: ev => { removing = !removing; ev.target.textContent = removing ? "Done removing" : "Remove corners"; if (removing) toast("Tap a red corner to remove it."); drawHandles(); } }),
+    el("button", { type: "button", class: "small danger", text: "Clear / redraw", onclick: () => { if (!pts.length || confirm("Clear all corners and start over?")) { pts.length = 0; commit(); const y = window.scrollY; renderForm(e); window.scrollTo(0, y); } } })
+  ]), el("p", { class: "help", text: "Drag a yellow corner to move it. Tap a small white dot to add a corner between two." }));
+  refresh(); setTimeout(drawHandles, 0);
   return box;
 }
 
@@ -586,6 +641,7 @@ function packForInbox(e) {   // photos travel separately from the answers; answe
   const take = src => { const m = /^data:([^;]+);base64,(.*)$/.exec(src || ""); if (!m) return null; media.push({ mime: m[1], data: m[2] }); return "media:" + (media.length - 1); };
   Q.questions.forEach(q => { if (q.type === "photo" && Array.isArray(data[q.id])) data[q.id] = data[q.id].map(take).filter(Boolean); });
   data._cemetery = e.cemetery; data._where = e.where; data._kind = e.kind; data._form = Q.version || 1;
+  if (e.moved) data._moved = { from: e.moved.from, to: e.where.ll };
   return { id: e.id, kind: "survey", target: e.target, data, media: media.slice(0, 6), created: e.created, submitter: invite && invite.name || "" };
 }
 async function sendPending(quiet) {
