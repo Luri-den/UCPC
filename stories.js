@@ -139,9 +139,28 @@
       } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
     };
     const l = section(si.querySelector("#si-lead"), lead
-      ? '<h3>County lead</h3><p class="ok">Lead key saved on this device. New additions show as a red badge on the map.</p><div class="row"><button type="button" class="go" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
+      ? '<h3>County lead</h3><p class="ok">Lead key saved on this device. New additions show as a red badge on the map.</p>' +
+        '<label for="si-new">Invite a surveyor</label><input type="text" id="si-new" placeholder="Their name" autocomplete="off"><div class="row"><button type="button" class="go" id="si-inv">Invite and show QR code</button></div><div class="msg" id="si-imsg" role="status"></div>' +
+        '<div class="row"><button type="button" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
       : '<h3>County lead</h3><label for="si-key">Lead key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
-    if (lead) { l("si-ed").onclick = () => { location.href = "editor.html"; }; l("si-lout").onclick = () => { store.set(leadKeyName, ""); drawSignIn(); menu(); checkBadge(); }; }
+    if (lead) {
+      l("si-ed").onclick = () => { location.href = "editor.html"; };
+      l("si-lout").onclick = () => { store.set(leadKeyName, ""); drawSignIn(); menu(); checkBadge(); };
+      const invite1 = async () => {
+        const name = l("si-new").value.trim(), m = l("si-imsg");
+        if (!name) { m.textContent = "Type their name first."; m.className = "msg err"; l("si-new").focus(); return; }
+        m.textContent = "Making the invite…"; m.className = "msg";
+        try {
+          const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
+          if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
+          await needQR();
+          l("si-new").value = ""; m.textContent = "Invited " + j.name + "."; m.className = "msg ok";
+          QR.show({ title: "Welcome, " + j.name + "!", sub: "Scan with your phone's camera to start surveying", link: new URL("survey.html?invite=" + encodeURIComponent(j.code), document.baseURI).href, onNext: () => { l("si-new").focus(); } });
+        } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
+      };
+      l("si-inv").onclick = invite1;
+      l("si-new").addEventListener("keydown", e => { if (e.key === "Enter") invite1(); });
+    }
     else l("si-lin").onclick = async () => {
       const key = l("si-key").value.trim(), m = l("si-lmsg");
       if (!key) { m.textContent = "Type the lead key."; m.className = "msg err"; return; }
@@ -153,6 +172,8 @@
       } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
     };
   }
+  let qrReady = null;
+  const needQR = () => qrReady || (qrReady = window.QR ? Promise.resolve() : new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "qr.js"; sc.onload = ok; sc.onerror = () => bad(new Error("qr.js missing")); document.head.append(sc); }));
   function openSignIn() { drawSignIn(); si.hidden = false; const f = si.querySelector("input"); if (f) f.focus(); }
 
   /* ---------- approved stories ---------- */

@@ -392,6 +392,12 @@
   }
 
   /* ---------- surveyors ---------- */
+  let qrReady = null;
+  const needQR = () => qrReady || (qrReady = window.QR ? Promise.resolve() : new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "qr.js"; sc.onload = ok; sc.onerror = () => bad(new Error("qr.js is missing. Put it next to editor.html.")); document.head.append(sc); }));
+  async function showQR(name, code, again) {
+    try { await needQR(); QR.show({ title: "Welcome, " + name + "!", sub: "Scan with your phone's camera to start surveying", link: surveyLink(code), onNext: again }); }
+    catch (e) { say(e.message); }
+  }
   function surveyorsBox() {
     const box = el("div", { className: "box" }, [el("b", { textContent: "Surveyors" })]);
     const name = el("input", { placeholder: "Name of the new surveyor" }), out = el("div");
@@ -401,9 +407,10 @@
         try { const r = await call("/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.value.trim() }) }), j = await r.json(); if (!j.ok) throw new Error(j.error);
           const link = surveyLink(j.code); out.textContent = "";
           const inp = el("input", { value: link, readOnly: true });
-          out.append(el("small", { textContent: "Send this link to " + j.name + ". It unlocks the survey on their phone:" }), inp,
-            el("div", { className: "row" }, [el("button", { textContent: "Copy Link", onclick: () => { inp.select(); navigator.clipboard ? navigator.clipboard.writeText(link).then(() => say("Copied.")) : document.execCommand("copy"); } })]));
+          out.append(el("small", { textContent: "Show the QR code for " + j.name + " to scan, or send this link. It unlocks the survey on their phone:" }), inp,
+            el("div", { className: "row" }, [el("button", { textContent: "Show QR Code", onclick: () => showQR(j.name, j.code) }), el("button", { textContent: "Copy Link", onclick: () => { inp.select(); navigator.clipboard ? navigator.clipboard.writeText(link).then(() => say("Copied.")) : document.execCommand("copy"); } })]));
           name.value = ""; invites = null; loadInvites(list);
+          showQR(j.name, j.code, () => { name.focus(); say("Type the next person's name, then Invite Surveyor."); });
         } catch (e) { say(e.message); } } }), el("button", { textContent: "Show Surveyors", onclick: () => loadInvites(list) })]), out);
     const list = el("div"); box.append(list);
     if (invites) showInvites(list);
@@ -421,6 +428,7 @@
     if (!invites.length) { list.append(el("small", { textContent: "No surveyors yet." })); return; }
     invites.forEach(v => list.append(el("div", { className: "row", style: "font-size:12px" }, [
       el("span", { textContent: v.name + (v.revoked ? " (revoked)" : "") + " · " + v.sent + " sent", style: "flex:1;" + (v.revoked ? "color:#999;text-decoration:line-through" : "") }),
+      v.revoked ? el("span") : el("button", { textContent: "QR", title: "Show " + v.name + "'s invite as a QR code", onclick: () => showQR(v.name, v.code) }),
       v.revoked ? el("span") : el("button", { textContent: "Link", onclick: () => { prompt("Invite link for " + v.name + ":", surveyLink(v.code)); } }),
       v.revoked ? el("span") : el("button", { className: "bad", textContent: "Revoke", onclick: async () => {
         if (!confirm("Revoke " + v.name + "'s invite? Their phone can't send surveys after this.")) return;
