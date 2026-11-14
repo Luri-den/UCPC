@@ -179,7 +179,18 @@ function contactLine() {
 function showNoInvite() {
   $("homeBtn").classList.add("hidden"); bar([]);
   $("main").innerHTML = '<div class="card"><h2>Would you like to help survey?</h2><p>Surveys are done by invited volunteers so every record can be checked. To get an invite, contact ' + contactLine() + ".</p>" +
-    '<p class="muted">Already have an invite link? Open it on this phone and the survey unlocks.</p><p><a href="test3.html">Back to the map</a></p></div>';
+    '<p class="muted">Already have an invite? Open the link on this phone, or type the code:</p>' +
+    '<input type="text" id="codeIn" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD" aria-label="Invite code"><button type="button" class="primary big" id="codeGo">Sign in</button><p id="codeMsg" class="err" role="status"></p>' +
+    '<p><a href="test3.html">Back to the map</a></p></div>';
+  $("codeGo").onclick = async () => {
+    const code = $("codeIn").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = $("codeMsg");
+    if (!code) { m.textContent = "Type your invite code."; return; }
+    m.textContent = "Checking…";
+    try { const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": code } }), j = await r.json();
+      if (!j.ok) { m.textContent = j.error || "That code didn't work."; return; }
+      invite = { code, name: j.name }; store.set("invite:" + AREA, JSON.stringify(invite)); await pruneSent(); showHome(); sendPending(true);
+    } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection and try again."; }
+  };
 }
 
 /* ---------------- home ---------------- */

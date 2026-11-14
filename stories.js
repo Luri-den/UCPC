@@ -29,28 +29,106 @@
   .st-tag{display:inline-block;font-size:.75em;padding:1px 8px;border-radius:999px;background:#eee7da;color:#5f574c;margin-left:4px}
   .st-item img{max-width:100%;border-radius:8px;margin:4px 0}
   .st-share{min-height:44px;padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#01796F);background:#fff;color:var(--accent,#01796F);font:inherit;font-weight:600;cursor:pointer}
-  #st-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
-  #st-modal[hidden]{display:none}
-  #st-modal .box{background:#fff;color:#1f1b16;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
-  @media(min-width:700px){#st-modal{align-items:center}#st-modal .box{border-radius:14px}}
-  #st-modal h2{margin:0 0 4px;font-size:1.2em}
-  #st-modal label{display:block;font-weight:600;margin:12px 0 4px}
-  #st-modal input[type=text],#st-modal input[type=email],#st-modal textarea,#st-modal select{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #b9b1a3;border-radius:8px}
-  #st-modal textarea{min-height:140px;resize:vertical}
-  #st-modal .hint{font-size:.85em;color:#5f574c;font-weight:400;margin:2px 0 0}
-  #st-modal .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px}
-  #st-modal .chk input{margin-top:4px;width:20px;height:20px;flex:none}
-  #st-modal .row{display:flex;gap:8px;margin-top:16px}
-  #st-modal .box,#st-modal .box *{text-shadow:none}
-  #st-modal input,#st-modal textarea,#st-modal select{color:#1f1b16!important;background:#fff!important}
-  #st-modal .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #8a8174!important;background:#fff!important;color:#1f1b16!important;box-shadow:none!important;text-transform:none;letter-spacing:normal}
-  #st-modal .row button.go{background:var(--accent,#01796F)!important;border-color:var(--accent,#01796F)!important;color:#fff!important}
-  #st-modal .row button:disabled{opacity:.55}
+  .stm{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+  .stm[hidden]{display:none}
+  .stm .box{background:#fff;color:#1f1b16;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+  @media(min-width:700px){.stm{align-items:center}.stm .box{border-radius:14px}}
+  .stm h2{margin:0 0 4px;font-size:1.2em}
+  .stm label{display:block;font-weight:600;margin:12px 0 4px}
+  .stm input[type=text],.stm input[type=email],.stm textarea,.stm select{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #b9b1a3;border-radius:8px}
+  .stm textarea{min-height:140px;resize:vertical}
+  .stm .hint{font-size:.85em;color:#5f574c;font-weight:400;margin:2px 0 0}
+  .stm .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px}
+  .stm .chk input{margin-top:4px;width:20px;height:20px;flex:none}
+  .stm .row{display:flex;gap:8px;margin-top:16px}
+  .stm .box,.stm .box *{text-shadow:none}
+  .stm input,.stm textarea,.stm select{color:#1f1b16!important;background:#fff!important}
+  .stm .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #8a8174!important;background:#fff!important;color:#1f1b16!important;box-shadow:none!important;text-transform:none;letter-spacing:normal}
+  .stm .row button.go{background:var(--accent,#01796F)!important;border-color:var(--accent,#01796F)!important;color:#fff!important}
+  .stm .row button:disabled{opacity:.55}
+  #lead-badge[hidden]{display:none!important}
+  .stm .ok{color:#1d6b3a}.stm hr{border:0;border-top:1px solid #e5dfd3;margin:16px 0}
   .st-share{background:#fff!important;color:var(--accent,#01796F)!important;border:1px solid var(--accent,#01796F)!important}
-  #st-modal .msg{margin-top:10px;font-size:.95em}
-  #st-modal .msg.err{color:#9b1c1c}
-  #st-modal .thumb{max-width:120px;border-radius:8px;display:block;margin-top:6px}`;
+  .stm .msg{margin-top:10px;font-size:.95em}
+  .stm .msg.err{color:#9b1c1c}
+  .stm .thumb{max-width:120px;border-radius:8px;display:block;margin-top:6px}`;
   document.head.append(css);
+
+  /* ---------- signing in on the map: volunteers type their invite code, leads type the lead key ---------- */
+  const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };
+  const inviteKey = "invite:" + AREA, leadKeyName = "leadKey:" + AREA;
+  const invite = () => { try { return JSON.parse(store.get(inviteKey) || "null"); } catch (e) { return null; } };
+  const nav = document.querySelector("#menu-panel .menu-links");
+  const surveyLink = document.createElement("a"), editorLink = document.createElement("a"), signLink = document.createElement("a");
+  surveyLink.href = "survey.html"; editorLink.href = "editor.html"; signLink.href = "#";
+  signLink.addEventListener("click", function (e) { e.preventDefault(); openSignIn(); });
+  function menu() {
+    if (!nav) return;
+    const inv = invite(), lead = store.get(leadKeyName);
+    surveyLink.textContent = inv ? "Survey (signed in" + (inv.name ? " as " + inv.name : "") + ")" : "Help Survey (Volunteers)";
+    editorLink.textContent = "Review New Additions (Editor)"; editorLink.style.display = lead ? "" : "none";
+    signLink.textContent = inv || lead ? "Volunteer & Lead Sign-In (signed in)" : "Volunteer & Lead Sign-In";
+    [surveyLink, editorLink, signLink].forEach(a => { if (!a.parentNode) nav.append(a); });
+  }
+  if (INBOX && AREA) menu();
+
+  /* the lead's red badge: only in a browser where the lead key is saved */
+  const badge = document.createElement("a");
+  badge.href = "editor.html"; badge.id = "lead-badge"; badge.hidden = true;
+  badge.style.cssText = "position:fixed;z-index:9998;left:10px;top:calc(70px + env(safe-area-inset-top));background:#c62828;color:#fff;padding:8px 12px;border-radius:999px;font:600 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.3)";
+  badge.title = "Only you see this, because your lead key is saved in this browser.";
+  document.body.append(badge);
+  function checkBadge() {
+    const key = store.get(leadKeyName); if (!key || !INBOX || !AREA) { badge.hidden = true; return; }
+    fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
+      if (!j || !j.ok) { badge.hidden = true; return; }
+      badge.textContent = "\u25CF " + j.total + " new for review"; badge.hidden = !j.total;
+    }).catch(() => {});
+  }
+  checkBadge(); setInterval(() => { if (!document.hidden) checkBadge(); }, 300000);
+
+  const si = document.createElement("div");
+  si.id = "si-modal"; si.className = "stm"; si.hidden = true; si.setAttribute("role", "dialog"); si.setAttribute("aria-modal", "true"); si.setAttribute("aria-labelledby", "si-title");
+  si.innerHTML = `<div class="box"><h2 id="si-title">Volunteer & Lead Sign-In</h2>
+    <p class="hint">For people helping record the cemeteries. Visitors don't need to sign in.</p>
+    <div id="si-vol"></div><hr><div id="si-lead"></div>
+    <div class="row"><button type="button" id="si-close">Close</button></div></div>`;
+  document.body.append(si);
+  si.addEventListener("click", e => { if (e.target === si) si.hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !si.hidden) si.hidden = true; });
+  si.querySelector("#si-close").addEventListener("click", () => { si.hidden = true; });
+  function section(box, html) { box.innerHTML = html; return id => box.querySelector("#" + id); }
+  function drawSignIn() {
+    const inv = invite(), lead = store.get(leadKeyName);
+    const v = section(si.querySelector("#si-vol"), inv
+      ? '<h3>Surveyor</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
+      : '<h3>Surveyor</h3><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">It\'s in the invite link your county lead sent you (after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
+    if (inv) { v("si-go").onclick = () => { location.href = "survey.html"; }; v("si-out").onclick = () => { if (confirm("Sign out of surveying on this device? Surveys not yet sent stay saved on it.")) { store.set(inviteKey, ""); drawSignIn(); menu(); } }; }
+    else v("si-in").onclick = async () => {
+      const code = v("si-code").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = v("si-vmsg");
+      if (!code) { m.textContent = "Type your invite code."; m.className = "msg err"; return; }
+      m.textContent = "Checking…"; m.className = "msg";
+      try { const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": code } }), j = await r.json();
+        if (!j.ok) { m.textContent = j.error || "That code didn't work."; m.className = "msg err"; return; }
+        store.set(inviteKey, JSON.stringify({ code, name: j.name })); drawSignIn(); menu();
+      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
+    };
+    const l = section(si.querySelector("#si-lead"), lead
+      ? '<h3>County lead</h3><p class="ok">Lead key saved on this device. New additions show as a red badge on the map.</p><div class="row"><button type="button" class="go" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
+      : '<h3>County lead</h3><label for="si-key">Lead key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
+    if (lead) { l("si-ed").onclick = () => { location.href = "editor.html"; }; l("si-lout").onclick = () => { store.set(leadKeyName, ""); drawSignIn(); menu(); checkBadge(); }; }
+    else l("si-lin").onclick = async () => {
+      const key = l("si-key").value.trim(), m = l("si-lmsg");
+      if (!key) { m.textContent = "Type the lead key."; m.className = "msg err"; return; }
+      m.textContent = "Checking…"; m.className = "msg";
+      try { const r = await fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } });
+        if (r.status === 403) { m.textContent = "That lead key isn't right."; m.className = "msg err"; return; }
+        const j = await r.json(); if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
+        store.set(leadKeyName, key); drawSignIn(); menu(); checkBadge();
+      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
+    };
+  }
+  function openSignIn() { drawSignIn(); si.hidden = false; const f = si.querySelector("input"); if (f) f.focus(); }
 
   /* ---------- approved stories ---------- */
   let STORIES = [];
@@ -102,7 +180,7 @@
 
   /* ---------- the Share a Story form ---------- */
   const modal = document.createElement("div");
-  modal.id = "st-modal"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true"); modal.setAttribute("aria-labelledby", "st-title");
+  modal.id = "st-modal"; modal.className = "stm"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true"); modal.setAttribute("aria-labelledby", "st-title");
   modal.innerHTML = `<div class="box">
     <h2 id="st-title">Share a story or memory</h2><p class="hint" id="st-about"></p>
     <label for="st-text">Your story, memory or information <span aria-hidden="true">*</span></label>

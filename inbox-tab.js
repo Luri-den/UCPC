@@ -29,7 +29,7 @@
   const STORY_COLS = ["STORY_ID", "TARGET_TYPE", "TARGET_ID", "CEMETERY_ID", "PERSON", "TEXT", "QUOTE", "TOLD_BY", "CONNECTION", "DATE_TOLD", "TAG", "SOURCE", "PHOTO"];
   const VISIT_COLS = ["VISIT_ID", "DATE", "CEMETERY_ID", "TARGET_TYPE", "TARGET_ID", "SURVEYOR", "SUMMARY", "DATA"];
 
-  let items = [], current = null, filter = "all", lastCheck = null, invites = null;
+  let items = [], current = null, filter = "all", lastCheck = null, invites = null, lastError = "";
   const queuedApprove = new Set();            // inbox ids to mark approved after the next Save / Publish
   const mediaUrls = new Map();                // media id -> object URL (for showing photos)
 
@@ -88,7 +88,8 @@
     const k = getKey(); if (!inbox()) throw new Error("No inbox address. Add \"inbox\" to settings.json.");
     if (!k) throw new Error("Enter the lead key first.");
     const r = await fetch(inbox() + "/" + area() + path, Object.assign({}, opts, { headers: Object.assign({ "X-Lead-Key": k }, (opts && opts.headers) || {}) }));
-    if (r.status === 403) throw new Error("The inbox refused the lead key. Check it and try again.");
+    if (r.status === 403) throw new Error("The inbox refused the lead key for " + area() + ". Use Forget Lead Key below and type it again (just the phrase, no braces or quotes).");
+    if (r.status === 404) { const j = await r.clone().json().catch(() => ({})); if (j.error === "Unknown county.") throw new Error("The inbox doesn't know the county code \"" + area() + "\". The editor's Cemetery ID Letters (Map tab) must match the code in LEAD_KEYS in Cloudflare, e.g. {\"" + area() + "\":\"your-phrase\"}."); }
     return r;
   }
   async function checkInbox(quiet) {
@@ -98,9 +99,9 @@
       if (!j.ok) throw new Error(j.error || "The inbox didn't answer.");
       const local = items.filter(i => i.local);
       items = j.items.filter(i => !queuedApprove.has(i.id)).map(i => Object.assign(i, { local: false })).concat(local);
-      lastCheck = new Date(); if (current && !items.includes(current)) current = items.find(i => i.id === current.id) || null;
+      lastCheck = new Date(); lastError = ""; if (current && !items.includes(current)) current = items.find(i => i.id === current.id) || null;
       badge(); if (!quiet) say(items.length ? items.length + " new addition" + (items.length === 1 ? "" : "s") + " waiting." : "Nothing new in the inbox.");
-    } catch (e) { if (!quiet) say(e.message); }
+    } catch (e) { lastError = (e && e.message === "Failed to fetch") ? "Couldn't reach the inbox at " + inbox() + ". Check the \"inbox\" address in settings.json and your internet connection." : String(e && e.message || e); if (!quiet) say(lastError); }
     draw();
   }
   async function mark(ids, status, purge) {
@@ -121,7 +122,28 @@
     const b = await mediaBlob(it, ref); if (!b) return null;
     const u = URL.createObjectURL(b); mediaUrls.set(key, u); return u;
   }
-  function badge() { if (tabBtn) tabBtn.textContent = "New" + (items.length ? " (" + items.length + ")" : ""); }
+  /* the alerts: a red count on the New tab, a banner at the top of the sidebar, and the count in the browser tab's title */
+  const baseTitle = document.title;
+  const banner = el("div", { id: "inbBanner", hidden: true, style: "margin-top:6px;background:#fff;color:#7a1f1f;border-radius:6px;padding:6px 8px;font-weight:bold;display:flex;gap:8px;align-items:center" });
+  const topBox = document.querySelector(".top"); if (topBox) topBox.append(banner);
+  const pillCss = document.createElement("style");
+  pillCss.textContent = ".inb-pill{display:inline-block;min-width:18px;padding:1px 6px;margin-left:4px;border-radius:999px;background:#c62828;color:#fff;font-size:11px;line-height:16px;vertical-align:1px}#inbBanner[hidden]{display:none!important}";
+  document.head.append(pillCss);
+  let waiting = 0;
+  function showCount(n) {
+    waiting = Math.max(0, n);
+    if (tabBtn) { tabBtn.textContent = "New"; if (waiting) tabBtn.append(el("span", { className: "inb-pill", textContent: String(waiting) })); }
+    document.title = (waiting ? "(" + waiting + ") " : "") + baseTitle;
+    banner.textContent = "";
+    banner.hidden = !waiting || curTab === "inb";
+    if (waiting) banner.append(el("span", { textContent: "● " + waiting + " new addition" + (waiting === 1 ? "" : "s") + " waiting", style: "flex:1" }),
+      el("button", { textContent: "Review", onclick: () => { tab("inb"); draw(); checkInbox(true); } }));
+  }
+  function badge() { showCount(items.length); }
+  async function poll() {                          // a light check every 2 minutes while the editor is open
+    if (!getKey() || !inbox() || document.hidden) return;
+    try { const r = await call("/count"), j = await r.json(); if (j.ok) { const n = j.total - queuedApprove.size; if (n !== items.length && curTab === "inb") checkInbox(true); else showCount(n); } } catch (e) {}
+  }
 
   /* ---------- reading an item ---------- */
   const D = it => it.data || {};
@@ -191,6 +213,8 @@
       return importRow();
     }
     const counts = { all: items.length, member: items.filter(i => i.channel === "member").length, public: items.filter(i => i.channel === "public").length };
+    pane.append(el("small", { textContent: "Inbox: " + inbox() + " · County code: " + (area() || "(none)") }));
+    if (lastError) pane.append(el("div", { className: "box", style: "background:#fdecea;border-color:#e5b4b4;color:#7a1f1f" }, [el("b", { textContent: "Couldn't check the inbox" }), el("div", { textContent: lastError })]));
     pane.append(el("div", { className: "row" }, [
       el("button", { className: "go", textContent: "Check Inbox", onclick: () => checkInbox(false) }),
       el("small", { textContent: lastCheck ? "Checked " + lastCheck.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "" })
@@ -422,7 +446,9 @@
   /* ---------- start ---------- */
   if (tabBtn) tabBtn.addEventListener("click", () => { draw(); if (getKey() && !lastCheck) checkInbox(true); });
   const _tab = tab;
-  tab = function (t) { _tab(t); if (t !== "inb" && map.getSource("inbx")) map.getSource("inbx").setData(EMPTY); };
+  tab = function (t) { _tab(t); if (t !== "inb" && map.getSource("inbx")) map.getSource("inbx").setData(EMPTY); showCount(waiting); };
   setTimeout(() => { if (getKey() && inbox()) checkInbox(true); }, 2500);
+  setInterval(poll, 120000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   draw();
 })();
