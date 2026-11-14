@@ -1,0 +1,8 @@
+{
+  "name": "Union County Cemetery Survey",
+  "short_name": "UC Survey",
+  "start_url": "survey.html",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#01796F"
+}
