@@ -57,7 +57,7 @@
   function sync() {
     const inSetup = setup.find(s => s[0] === curTab);
     setupBtn.classList.toggle("on", !!inSetup);
-    setupBtn.textContent = (inSetup ? inSetup[1] : "Setup") + " ▾";
+    setupBtn.title = inSetup ? "Setup: " + inSetup[1] : "Setup";
     nameEl.textContent = (typeof S !== "undefined" && S && S.name) ? S.name : "";
     const a = typeof S !== "undefined" && S && S.colors && S.colors.accent; if (a) document.documentElement.style.setProperty("--accent", a);
   }

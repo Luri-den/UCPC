@@ -145,6 +145,10 @@
     try { const r = await call("/count"), j = await r.json(); if (j.ok) { const n = j.total - queuedApprove.size; if (n !== items.length && curTab === "inb") checkInbox(true); else showCount(n); } } catch (e) {}
   }
 
+  /* the survey's own wording for each answer, so the review reads like the form did */
+  const qLabels = {};
+  if (/^https?:/.test(location.protocol)) fetch(new URL("survey.json", document.baseURI).href, { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => { ((j && j.questions) || []).forEach(q => { qLabels[q.id] = String(q.label || "").replace(/\s*\(.*?\)\s*$/, "").replace(/[?:]$/, ""); }); }).catch(() => {});
+
   /* ---------- reading an item ---------- */
   const D = it => it.data || {};
   const kindOf = it => it.kind === "story" ? "story" : (D(it)._kind || it.target_type || "survey");
@@ -213,7 +217,7 @@
       return importRow();
     }
     const counts = { all: items.length, member: items.filter(i => i.channel === "member").length, public: items.filter(i => i.channel === "public").length };
-    pane.append(el("small", { textContent: "Inbox: " + inbox() + " · County code: " + (area() || "(none)") }));
+    if (lastError) pane.append(el("small", { textContent: "Inbox: " + inbox() + " · County code: " + (area() || "(none)") }));
     if (lastError) pane.append(el("div", { className: "box", style: "background:#fdecea;border-color:#e5b4b4;color:#7a1f1f" }, [el("b", { textContent: "Couldn't check the inbox" }), el("div", { textContent: lastError })]));
     pane.append(el("div", { className: "row" }, [
       el("button", { className: "go", textContent: "Check Inbox", onclick: () => checkInbox(false) }),
@@ -243,7 +247,7 @@
   function answersHtml(it) {
     const d = D(it), skip = new Set(["_cemetery", "_where", "_kind", "_form", "_moved", "boundary", "entrance_point", "hazard_spots", "people", "photos", "entrance_photo", "cem_photos", "photo", "consent", "page", "label", "cemetery", "person", "boundary_source"]);
     let h = "";
-    Object.keys(d).forEach(k => { if (skip.has(k) || d[k] === "" || d[k] == null) return; h += "<div><b>" + H(k.replace(/_/g, " ")) + ":</b> " + H(Array.isArray(d[k]) ? d[k].join(", ") : typeof d[k] === "object" ? JSON.stringify(d[k]) : d[k]) + "</div>"; });
+    Object.keys(d).forEach(k => { if (skip.has(k) || d[k] === "" || d[k] == null) return; h += "<div><b>" + H(qLabels[k] || k.replace(/_/g, " ")) + ":</b> " + H(Array.isArray(d[k]) ? d[k].join(", ") : typeof d[k] === "object" ? JSON.stringify(d[k]) : d[k]) + "</div>"; });
     (d.people || []).forEach((p, i) => { h += "<div><b>Person " + (i + 1) + ":</b> " + H([p.first, p.last].filter(Boolean).join(" ") || "(name not read)") + (p.birth ? " · b. " + H(p.birth) : "") + (p.death ? " · d. " + H(p.death) : "") + (p.sex ? " · " + H(p.sex) : "") + "</div>"; });
     if (d.boundary) h += "<div><b>Boundary:</b> " + d.boundary.length + " corners (" + H(d.boundary_source === "edited" ? "fixed from the existing outline" : "drawn new") + ")</div>";
     if (d.entrance_point) h += "<div><b>Entrance:</b> marked (green dot)</div>";

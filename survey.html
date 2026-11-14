@@ -137,8 +137,8 @@ async function boot() {
   Q = await getJson("survey.json", { questions: [] });
   AREA = String(S.idPrefix || S.shortName || "AREA").toUpperCase();
   INBOX = String(S.inbox || DEFAULT_INBOX).replace(/\/+$/, "");
-  document.documentElement.style.setProperty("--accent", (S.colors && S.colors.public) || "#01796F");
-  $("title").textContent = (S.name ? S.name + " " : "") + "Cemetery Survey";
+  document.documentElement.style.setProperty("--accent", (S.colors && (S.colors.accent || S.colors.public)) || "#01796F");
+  $("title").textContent = S.name ? S.name + " Survey" : "Cemetery Survey";
   document.title = $("title").textContent;
   const files = S.files || {};
   const [cems, stones, bounds] = await Promise.all([getCsv(files.cemeteries || "cemlist.csv"), getCsv(files.interments || "interments.csv"), getJson(files.boundaries || "cemetery-boundaries.geojson", null)]);

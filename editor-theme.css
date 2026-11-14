@@ -18,7 +18,7 @@ body.ed .ed-actions button{margin:0}
 body.ed .ed-actions .ed-publish{flex:1;background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600;margin:0!important}
 body.ed .ed-actions .ed-gear{margin:0!important}
 body.ed #msg{margin-top:8px;font-size:12.5px;color:var(--muted);min-height:18px}
-body.ed #inbBanner{background:#fdecea!important;border:1px solid #f1c4c0;border-radius:var(--r)!important;padding:8px 10px!important;font-weight:600!important}
+body.ed #inbBanner{display:none!important}   /* the red count on Review already says it */
 
 /* ---- menus (File, Setup) ---- */
 body.ed .ed-menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(31,27,22,.16);display:none;flex-direction:column;gap:2px}
@@ -97,7 +97,6 @@ body.ed .ed-size{display:none}
   body.ed .ed-actions .ed-publish{flex:none;padding:8px 14px}
   body.ed .ed-actions .ed-menu{left:auto;right:0}
   body.ed #msg{grid-column:1/-1;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0}
-  body.ed #inbBanner{grid-column:1/-1;margin:0!important}
   body.ed .tabs{padding:6px 8px}
   body.ed .tabs>button,body.ed .ed-setup-btn{padding:10px 6px!important;font-size:14px!important}
   body.ed .pane{padding:12px}
