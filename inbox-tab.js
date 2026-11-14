@@ -132,7 +132,7 @@
   let waiting = 0;
   function showCount(n) {
     waiting = Math.max(0, n);
-    if (tabBtn) { tabBtn.textContent = "New"; if (waiting) tabBtn.append(el("span", { className: "inb-pill", textContent: String(waiting) })); }
+    if (tabBtn) { tabBtn.textContent = "Review"; if (waiting) tabBtn.append(el("span", { className: "inb-pill", textContent: String(waiting) })); }
     document.title = (waiting ? "(" + waiting + ") " : "") + baseTitle;
     banner.textContent = "";
     banner.hidden = !waiting || curTab === "inb";

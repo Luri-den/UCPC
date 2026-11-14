@@ -1,0 +1,113 @@
+/* editor-theme.css - the editor's look. Loaded after editor.html's own styles, with shell.js.
+   Only appearance lives here; delete the <link> and the editor still works with its old look.
+   --accent comes from the map's Page Header color (settings.json), so each county keeps its own color. */
+:root{--accent:#01796F;--accent-ink:#fff;--ink:#1f1b16;--muted:#6b6459;--line:#e2ddd2;--line-strong:#c9c2b4;--bg:#f6f4ee;--card:#fff;--tint:#eef5f3;--bad:#a12626;--r:10px;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+body.ed{font:14px/1.45 var(--font);color:var(--ink);background:var(--bg)}
+body.ed aside{width:400px;max-width:48vw;border-right:1px solid var(--line);background:var(--bg)}
+
+/* ---- top bar ---- */
+body.ed .top{background:var(--card);color:var(--ink);padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+body.ed .ed-brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+body.ed .ed-brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
+body.ed .ed-brand b{font-size:16px;font-weight:650;letter-spacing:-.01em}
+body.ed .ed-brand span.name:not(:empty)::before{content:"· "}
+body.ed .ed-brand span.name{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.ed .ed-actions{display:flex;gap:8px;align-items:center;position:relative}
+body.ed .ed-actions button{margin:0}
+body.ed .ed-actions .ed-publish{flex:1;background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600;margin:0!important}
+body.ed .ed-actions .ed-gear{margin:0!important}
+body.ed #msg{margin-top:8px;font-size:12.5px;color:var(--muted);min-height:18px}
+body.ed #inbBanner{background:#fdecea!important;border:1px solid #f1c4c0;border-radius:var(--r)!important;padding:8px 10px!important;font-weight:600!important}
+
+/* ---- menus (File, Setup) ---- */
+body.ed .ed-menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(31,27,22,.16);display:none;flex-direction:column;gap:2px}
+body.ed .ed-menu.open{display:flex}
+body.ed .ed-menu button{all:unset;box-sizing:border-box;display:block;width:100%;padding:9px 12px;border-radius:8px;cursor:pointer;font:inherit;color:var(--ink)}
+body.ed .ed-menu button:hover,body.ed .ed-menu button:focus-visible{background:var(--tint)}
+body.ed .ed-menu button:disabled{color:#a9a399;cursor:default;background:none}
+body.ed .ed-menu button.on{font-weight:650;color:var(--accent)}
+body.ed .ed-menu button[hidden]{display:none}
+body.ed .ed-menu small{display:block;color:var(--muted);font-size:12px}
+
+/* ---- navigation ---- */
+body.ed .tabs{display:flex;flex-wrap:nowrap;gap:4px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--line);position:relative}
+body.ed .tabs>button,body.ed .tabs>.ed-setup>button.ed-setup-btn{flex:1 1 auto;padding:8px 10px;font:600 13.5px var(--font);border:1px solid transparent;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap}
+body.ed .tabs>button:hover,body.ed .ed-setup-btn:hover{background:#ebe7dd;color:var(--ink)}
+body.ed .tabs>button.on,body.ed .ed-setup-btn.on{background:var(--card);border-color:var(--line-strong);color:var(--ink);box-shadow:0 1px 2px rgba(31,27,22,.06)}
+body.ed .ed-setup{display:flex;flex:1 1 auto}
+body.ed .ed-setup .ed-menu{left:auto;right:10px}
+body.ed .inb-pill{background:#c62828;font-weight:700}
+
+/* ---- panes and form parts ---- */
+body.ed .pane{padding:14px}
+body.ed h3{margin:18px 0 6px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+body.ed .pane>h3:first-child,body.ed #cdet>h3:first-child,body.ed #gdet>h3:first-child{margin-top:4px}
+body.ed label{margin:12px 0 4px;font-size:12.5px;font-weight:600;color:#4a443b}
+body.ed small{color:var(--muted);font-size:12.5px}
+body.ed input:not([type=checkbox]):not([type=color]):not([type=range]):not([type=file]),body.ed select,body.ed textarea{padding:9px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;outline:none}
+body.ed input:focus-visible,body.ed select:focus-visible,body.ed textarea:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+body.ed textarea{height:76px}
+body.ed input[type=checkbox]{width:16px;height:16px;vertical-align:-3px;accent-color:var(--accent)}
+body.ed button{padding:8px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-weight:550}
+body.ed button:hover:not(:disabled){background:#f3f0e8}
+body.ed button:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:1px}
+body.ed button:disabled{opacity:.5;cursor:default}
+body.ed button.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+body.ed button.go:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000)}
+body.ed button.bad{color:var(--bad);border-color:#e6c3c3}
+body.ed .row{gap:8px;margin:8px 0}
+body.ed .list{border:1px solid var(--line);border-radius:var(--r);background:var(--card);margin:10px 0;max-height:230px}
+body.ed .list div{padding:9px 12px;border-bottom:1px solid #f0ece3}
+body.ed .list div:last-child{border-bottom:0}
+body.ed .list div:hover{background:#faf8f3}
+body.ed .list div.on{background:var(--tint);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
+body.ed .box{border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:12px 0;background:var(--card)}
+body.ed .box>b{font-weight:650;display:block;margin-bottom:4px}
+
+/* collapsible sections made by shell.js */
+body.ed details.ed-sec{border:1px solid var(--line);border-radius:var(--r);background:var(--card);margin:10px 0}
+body.ed details.ed-sec>summary{list-style:none;cursor:pointer;padding:11px 12px;font-weight:650;display:flex;align-items:center;gap:8px}
+body.ed details.ed-sec>summary::-webkit-details-marker{display:none}
+body.ed details.ed-sec>summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none}
+body.ed details.ed-sec[open]>summary::before{transform:rotate(45deg)}
+body.ed details.ed-sec>summary span.sum{margin-left:auto;font-weight:400;color:var(--muted);font-size:12.5px}
+body.ed details.ed-sec>.in{padding:0 12px 12px}
+body.ed details.ed-sec>.in>label:first-child{margin-top:2px}
+@media (prefers-reduced-motion:reduce){body.ed details.ed-sec>summary::before{transition:none}}
+
+/* ---- on the map ---- */
+body.ed #hint{background:#1f1b16;color:#fff;border:0;border-radius:999px;padding:9px 16px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-weight:550}
+body.ed #bm{border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.2);border:0;padding:8px 14px}
+
+/* ---- phones: the map on top, the form below, thumb-sized controls ---- */
+body.ed .ed-size{display:none}
+@media(max-width:700px){
+  body.ed{height:100dvh;font-size:15px}
+  body.ed aside{width:100%;max-width:none;height:60dvh;border-right:0;border-top:1px solid var(--line)}
+  body.ed #map{height:40dvh}
+  body.ed.form-big aside{height:80dvh}
+  body.ed.form-big #map{height:20dvh}
+  body.ed .top{padding:8px 10px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 8px}
+  body.ed .ed-brand{margin:0;min-width:0}
+  body.ed .ed-brand b{display:none}
+  body.ed .ed-brand span.name{color:var(--ink);font-weight:650}
+  body.ed .ed-brand span.name:not(:empty)::before{content:""}
+  body.ed .ed-actions{gap:6px}
+  body.ed .ed-actions .ed-publish{flex:none;padding:8px 14px}
+  body.ed .ed-actions .ed-menu{left:auto;right:0}
+  body.ed #msg{grid-column:1/-1;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0}
+  body.ed #inbBanner{grid-column:1/-1;margin:0!important}
+  body.ed .tabs{padding:6px 8px}
+  body.ed .tabs>button,body.ed .ed-setup-btn{padding:10px 6px!important;font-size:14px!important}
+  body.ed .pane{padding:12px}
+  body.ed button{min-height:44px;padding:10px 14px}
+  body.ed .list div{padding:12px}
+  body.ed input:not([type=checkbox]):not([type=color]):not([type=range]):not([type=file]),body.ed select,body.ed textarea{font-size:16px;padding:11px 12px;min-height:44px}
+  body.ed input[type=checkbox]{width:20px;height:20px}
+  body.ed details.ed-sec>summary{padding:14px 12px}
+  body.ed .ed-size{display:block;position:absolute;z-index:6;left:50%;bottom:8px;transform:translateX(-50%);border-radius:999px;border:0;box-shadow:0 2px 8px rgba(0,0,0,.25);min-height:36px;padding:6px 14px;font-size:13px}
+  body.ed .pin.gr,body.ed .pin.secondary{width:26px;height:26px}
+  body.ed .pin.cem,body.ed .pin.primary,body.ed .pin.start{width:32px;height:32px}
+  body.ed .vtx{width:22px;height:22px}
+}

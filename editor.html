@@ -45,6 +45,7 @@ small{color:#6b6258}
 .vtx{width:12px;height:12px;background:#fff;border:2px solid #000;cursor:move}
 @media(max-width:700px){body{flex-direction:column-reverse}aside{width:100%;max-width:none;height:55vh}#map{height:45vh}}
 </style>
+<link rel="stylesheet" href="editor-theme.css">
 </head>
 <body>
 <aside>
@@ -55,7 +56,7 @@ small{color:#6b6258}
     <button id="save" disabled>Save to Folder</button><button id="dlBtn" hidden>Download</button>
     <div id="msg">Click “Open My Map Files” and pick your map folder to begin.</div>
   </div>
-  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button><button data-t="qst">Survey</button><button data-t="inb">New</button></div>
+  <div class="tabs"><button data-t="set" class="on">Map</button><button data-t="cem">Cemeteries</button><button data-t="grv">Graves</button><button data-t="gui">Guides</button><button data-t="qst">Survey</button><button data-t="inb">Review</button></div>
 
   <div class="pane on" id="set">
     <label>Map Name</label><input id="sname">
@@ -766,7 +767,7 @@ async function load(files) {
   if (!cems.length) return say("I couldn't find the cemetery list (a .csv with ID and NAME columns). Open the whole map folder.");
   if (S.center) map.jumpTo({ center:S.center, zoom:S.zoom }); else fitCounty();
   $("#save").disabled = true; $("#save").className = "";
-  tab("set"); drawSet(); refresh();
+  tab(cems.length ? "cem" : "set"); drawSet(); refresh();
   if (!guide) guide = { intro:"", sections:[] };
   drawGuide();
   if (!S.overlays) S.overlays = S.files.county === "franklin-county.geojson" ? JSON.parse(JSON.stringify(LEGACY_OVERLAYS)) : [];   // Franklin's three old maps used to live inside test3
@@ -943,5 +944,6 @@ loadFromSite();
 <script src="questions-tab.js"></script>
 <script src="publish.js"></script>
 <script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish to GitHub", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say("Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
+<script src="shell.js"></script>
 </body>
 </html>

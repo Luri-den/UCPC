@@ -20,6 +20,7 @@
   /* ---------- styles ---------- */
   const css = document.createElement("style");
   css.textContent = `
+  html,body,button,input,select,textarea{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
   .st-sec{margin:14px 0 6px;padding-top:10px;border-top:1px solid #d8d2c6}
   .st-sec h3{margin:0 0 8px}
   .st-quote{font:italic 1.15em/1.45 Georgia,"Times New Roman",serif;margin:4px 0 12px;padding-left:12px;border-left:3px solid var(--accent,#01796F)}
