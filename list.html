@@ -7,6 +7,7 @@
 <title>Cemetery and People Lists</title>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="name-search.js"></script>
 
 <style>
     * { box-sizing: border-box; }
@@ -316,10 +317,10 @@ function searchTerms(text) {
     return String(text || "").toLowerCase().split(/[\s,]+/).filter(Boolean);
 }
 
-function matchesTerms(blob, terms) {
-    return terms.every(function (term) {
-        return blob.indexOf(term) !== -1;
-    });
+// Forgiving match (name-search.js): spelling slips, nicknames, accents, any word order, and years
+function matchesTerms(blob, terms, years) {
+    if (!terms.length) { return true; }
+    return NameSearch.score(terms.join(" "), { names: blob, years: years || [] }) > 0;
 }
 
 function loadCsv(path) {
@@ -539,7 +540,7 @@ function filteredPeople(applyLetter) {
             return false;
         }
 
-        return matchesTerms(person.blob, terms);
+        return matchesTerms(person.blob, terms, [person.birth, person.death]);
     });
 }
 

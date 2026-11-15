@@ -255,7 +255,7 @@
         if (canList) { try { list = await GHPublish.listFiles(); } catch (e) { notes.push("The file list could not be read (" + e.message + "), so only the known data files and pages were saved. Photos are NOT in this backup."); } }
         else notes.push("Photos and old map images are NOT in this backup, because the publish settings were not filled in.");
         const listed = !!list;
-        if (!list) list = [...new Set(KNOWN().concat(code.checked ? ["index.html", "list.html", "cemetery.html", "editor.html", "survey.html", "sw.js", "stories.js", "media.js", "inbox-tab.js", "questions-tab.js", "publish.js", "shell.js", "export-tools.js", "qr.js", "editor-theme.css"] : []))];
+        if (!list) list = [...new Set(KNOWN().concat(code.checked ? ["index.html", "list.html", "cemetery.html", "editor.html", "survey.html", "sw.js", "stories.js", "media.js", "name-search.js", "data-check.js", "inbox-tab.js", "questions-tab.js", "publish.js", "shell.js", "export-tools.js", "qr.js", "editor-theme.css"] : []))];
         const photoDirs = ["photos/", photoDir("cemeteries"), photoDir("graves"), photoDir("stories")];
         list = list.filter(p => {
           if (/^\.|\/\./.test(p)) return false;                                   // hidden folders (.git, .history)

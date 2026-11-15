@@ -75,6 +75,19 @@
   const _sync = syncFromGitHub;
   syncFromGitHub = async function () {           // before publishing: pick up anyone else's newer stories / visits too
     await _sync();
+    // Two leads may have approved the same survey before either published. Stories and visits are already
+    // matched by the survey's id. New graves carry it too (SURVEY_ID): if the published file already has this
+    // survey's grave, the copy made here is dropped instead of becoming a second grave.
+    if (dirty.has("ints") && ints.some(r => r.SURVEY_ID)) {
+      const t = await GHPublish.read(S.files.interments);
+      if (t) {
+        const pub = new Map(); parseCsv(t).data.forEach(r => { if (r.SURVEY_ID) pub.set(r.SURVEY_ID, r.MARKER_ID); });
+        const drop = new Set();
+        ints = ints.filter(r => { const m = r.SURVEY_ID && pub.get(r.SURVEY_ID); if (m && m !== r.MARKER_ID) { drop.add(r.MARKER_ID); return false; } return true; });
+        drop.forEach(id => { const k = photoDir("graves") + id + "-1.jpg"; if (photos.has(k)) photos.delete(k); });
+        if (drop.size) { if (selG && !ints.includes(selG)) selG = null; refresh(); say("Another lead had already published " + drop.size + " of these graves, so your copies were dropped."); }
+      }
+    }
     for (const k of ["stories", "visits"]) if (dirty.has(k)) { const ok = await loadExtra(k, true); if (!ok) throw new Error("Couldn't read " + fileName(k) + " from GitHub."); }
   };
   const _clean = clean;
@@ -177,6 +190,16 @@
       const near = ints.filter(r => r.CEMETERY_ID === cemOf(it).ID && ll(r)).map(r => ({ r, d: dist(here, ll(r)) })).sort((a, b) => a.d - b.d)[0];
       if (near && near.d < 3) out.push("Possibly the same grave as " + (near.r.MARKER_ID || "an existing marker") + " (" + feet(near.d) + " away)");
       items.filter(o => o !== it && o.target_type === "new" && whereOf(o) && dist(here, whereOf(o)) < 3).forEach(o => out.push("Within 10 ft of another new find by " + (o.submitter || "someone")));
+    }
+    // data checks (data-check.js): impossible dates, ages, a spot far from the cemetery, a weak GPS reading
+    if (window.DataCheck && k === "marker") {
+      (d.people || []).forEach(p => DataCheck.person(p).forEach(x => out.push((x.level === "fix" ? "\u26a0 " : "") + ([p.first, p.last].filter(Boolean).join(" ") || "Person") + ": " + x.text)));
+      const w = d._moved ? d._moved.to : whereOf(it);
+      if (w) { const pl = DataCheck.place(cemOf(it).ID, +w[0], +w[1]); if (pl) out.push((pl.level === "fix" ? "\u26a0 " : "") + "The spot is " + pl.text.replace(/^Coordinates/, "coordinates")); }
+    }
+    if (k === "marker" || k === "cemetery") {
+      const acc = d._where && d._where.acc;
+      if (acc > 15 && d._where.how === "gps") out.push("Weak GPS reading (about " + Math.round(acc * 3.28084) + " ft). Check the spot on the map.");
     }
     return out;
   }
@@ -396,18 +419,20 @@
             if (stone && on("move") && d._moved) { const p = fix(d._moved.to); moveStone(stone, p[1], p[0]); touch("ints"); }
             if (stone && on("vet")) { sameStone(stone).forEach(x => x.VETERAN = "1"); touch("ints"); }
             if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set(photoDir("graves") + it.target_id + "-1.jpg", b); touch("photos"); } }
+          } else if (on("add") && ints.some(x => x.SURVEY_ID === it.id)) {
+            say("This grave was already added from this survey (by you or another lead), so it wasn't added again.");
           } else if (on("add")) {
             const p = fix(whereOf(it)), digits = (c.ID.replace(/\D/g, "") || "0").slice(-3).padStart(3, "0");
             let n = ints.filter(x => x.CEMETERY_ID === c.ID).length + 1, id;
             do { id = "M-" + digits + "-" + String(n++).padStart(3, "0"); } while (ints.some(x => x.MARKER_ID === id));
             const people = (d.people && d.people.length ? d.people : [{}]), above = /Above-ground/.test(d.feature_type || "");
             const note = [d.feature_type && !/^Headstone$/.test(d.feature_type) ? "[" + d.feature_type + (d.belongs_to ? ", belongs with " + d.belongs_to : "") + "]" : "", d.inscription || ""].filter(Boolean).join(" ");
-            need(intF, ["STONE_TYPE", "SEX"]);
+            need(intF, ["STONE_TYPE", "SEX", "SURVEY_ID"]);
             people.forEach((pp, i) => {
               const row = {}; intF.forEach(f => row[f] = "");
               Object.assign(row, { CEMETERY_ID: c.ID, MARKER_ID: id, PERSON_ID: people.length > 1 ? id + String.fromCharCode(65 + i) : id, "FIRST NAME": pp.first || "", "LAST NAME": pp.last || "Unknown",
                 BIRTH: pp.birth || "", DEATH: pp.death || "", SEX: pp.sex || "", VETERAN: d.veteran === "Yes" ? "1" : "0", PIONEER: "0", MAUS: above ? "1" : "0",
-                STONE_TYPE: above ? "Above Ground Structure (Mausoleum, etc.)" : "", ROW: d.row_plot || "", "ADDITIONAL INFORMATION ON STONE": note, LAT: p[1], LONG: p[0] });
+                STONE_TYPE: above ? "Above Ground Structure (Mausoleum, etc.)" : "", ROW: d.row_plot || "", SURVEY_ID: it.id, "ADDITIONAL INFORMATION ON STONE": note, LAT: p[1], LONG: p[0] });
               ints.push(row);
             });
             touch("ints");

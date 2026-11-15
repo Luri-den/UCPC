@@ -7,6 +7,23 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+/* Spreadsheet safety. Papa already wraps commas, quotes and line breaks correctly, so a value can't break out of its cell.
+   This adds one more guard: a cell starting with = + @ (or - followed by a letter) is run as a formula by Excel,
+   so someone could send "=HYPERLINK(...)" in a story. Such a cell gets a leading space: Excel then shows it as text,
+   and the map shows it unchanged. Numbers such as -84.9 are left alone. */
+(function () {
+  if (!window.Papa) return;
+  const unparse = Papa.unparse, risky = /^[=+@\t\r]|^-[^\d.\s]/;
+  const cell = v => typeof v === "string" && risky.test(v) ? " " + v : v;
+  const row = r => Array.isArray(r) ? r.map(cell) : r && typeof r === "object" ? Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cell(v)])) : r;
+  Papa.unparse = function (data, config) {
+    if (Array.isArray(data)) data = data.map(row);
+    else if (data && Array.isArray(data.data)) data = Object.assign({}, data, { data: data.data.map(row) });
+    return unparse.call(Papa, data, config);
+  };
+})();
+</script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;height:100vh;display:flex;font:14px Arial,sans-serif;color:#3f3528;background:#f4f1e8}
@@ -942,5 +959,6 @@ loadFromSite();
 <script>window.GHPublish ? GHPublish.attach({ buttons:["dlBtn"], label:"Publish", route:n => n, prepare:syncFromGitHub, onPublished:() => { takeSnap(); clean(); say(GHPublish.isServer() ? "Published." : "Published. The live site updates in about a minute."); } }) : say("publish.js is missing. Put it in the same folder as editor.html to turn on publishing.");</script>
 <script src="shell.js"></script>
 <script src="export-tools.js"></script>
+<script src="data-check.js"></script>
 </body>
 </html>

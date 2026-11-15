@@ -16,6 +16,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="name-search.js"></script>
 
 <style>
     * { box-sizing: border-box; }
@@ -3911,12 +3912,13 @@ function updateSearchResults(searchStr, filterYear) {
             return;
         }
 
-        const cemeteryText =
-            (String(props.Cemetery_Name || "") + " " + String(props.Other_Names || ""))
-                .toLowerCase();
+        // Forgiving match (name-search.js): spelling slips, nicknames, any word order, years
+        const cemScore = !scopedID && searchCemetery
+            ? NameSearch.score(searchStr, { names: String(props.Cemetery_Name || "") + " " + String(props.Other_Names || ""), other: String(props.Township || "") + " " + String(props.Cemetery_ID || "") })
+            : 0;
 
-        if (!scopedID && searchCemetery && cemeteryText.includes(searchStr)) {
-            cemeteryHits.push({ type: "cemetery", feature: feature });
+        if (cemScore) {
+            cemeteryHits.push({ type: "cemetery", feature: feature, score: cemScore });
         }
 
         if (searchPerson || scopedID) {
@@ -3927,20 +3929,21 @@ function updateSearchResults(searchStr, filterYear) {
                 }
 
                 const fullName = (person.firstName + " " + person.lastName).trim();
+                const personScore = fullName ? NameSearch.score(searchStr, { names: fullName, years: [person.birth, person.death] }) : 0;
 
-                if (fullName && fullName.toLowerCase().includes(searchStr)) {
-                    personHits.push({ type: "person", feature: feature, person: person });
+                if (personScore) {
+                    personHits.push({ type: "person", feature: feature, person: person, score: personScore });
                 }
             });
         }
     });
 
     cemeteryHits.sort(function (a, b) {
-        return compareText(a.feature.properties.Cemetery_Name, b.feature.properties.Cemetery_Name);
+        return (b.score - a.score) || compareText(a.feature.properties.Cemetery_Name, b.feature.properties.Cemetery_Name);
     });
 
     personHits.sort(function (a, b) {
-        return compareText(a.person.lastName, b.person.lastName) ||
+        return (b.score - a.score) || compareText(a.person.lastName, b.person.lastName) ||
                compareText(a.person.firstName, b.person.firstName);
     });
 
@@ -4128,16 +4131,16 @@ function processMapFilters() {
         const intermentData =
             intermentsByCemetery[cemeteryID] || { people: [], veteran: false };
 
-        const personText = intermentData.people.join(" ").toLowerCase();
-
         let textMatch = searchStr === "";
 
-        if (searchStr !== "") {
-            if (searchCemetery && cemeteryText.includes(searchStr)) {
+        if (searchStr !== "") {                 // the same forgiving match as the result list (name-search.js)
+            if (searchCemetery && NameSearch.score(searchStr, { names: cemeteryText, other: String(props.Township || "") + " " + cemeteryID })) {
                 textMatch = true;
             }
-            if (searchPerson && personText.includes(searchStr)) {
-                textMatch = true;
+            if (!textMatch && searchPerson) {
+                textMatch = (intermentData.rows || []).some(function (p) {
+                    return NameSearch.score(searchStr, { names: p.firstName + " " + p.lastName, years: [p.birth, p.death] }) > 0;
+                });
             }
         }
 
