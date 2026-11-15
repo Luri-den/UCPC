@@ -142,7 +142,7 @@
       mk("div", { className: "dc-foot" }, [
         mk("button", { type: "button", textContent: "Download This List", onclick: () => {
           const csv = Papa.unparse(found.map(f => ({ LEVEL: LEVELS.find(l => l[0] === f.level)[1], RECORD: f.title, PROBLEM: f.text })));
-          const a = mk("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "data-check-" + new Date().toISOString().slice(0, 10) + ".csv" }); document.body.append(a); a.click(); a.remove();
+          const a = mk("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "data-check-" + new Date().toISOString().slice(0, 10) + ".csv" }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
         } }),
         mk("button", { type: "button", textContent: "Close", onclick: () => ov.remove() })])
     ]));

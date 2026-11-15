@@ -290,7 +290,9 @@
           "NOTES"].concat(notes.length ? notes.map(n => "  - " + n) : ["  - Everything was copied."]).join("\r\n"));
         const blob = zip.blob(); download(area() + "-backup-" + today() + ".zip", blob);
         msg.className = "xt-msg " + (missing.length || notes.some(n => /NOT|could not/.test(n)) ? "err" : "ok");
-        msg.textContent = "Saved " + (zip.count() - 1) + " files (" + fmtSize(blob.size) + ") to your Downloads. " + notes.join(" ");
+        msg.textContent = "Saved " + (zip.count() - 1) + " files (" + fmtSize(blob.size) + ") to your Downloads. " + notes.join(" ") + " ";
+        // a backup takes a while, and some browsers (Safari especially) may block a download that wasn't a direct tap: offer a tap-to-save link too
+        msg.append(mk("a", { href: URL.createObjectURL(blob), download: area() + "-backup-" + today() + ".zip", textContent: "Didn't download? Tap here to save it.", style: "font-weight:600" }));
         no.textContent = "Close";
       } catch (e) { msg.className = "xt-msg err"; msg.textContent = "The backup failed: " + e.message; go.disabled = false; }
     };

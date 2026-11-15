@@ -3530,7 +3530,7 @@ function showCemeteryPanel(feature) {
         <p class="cem-row3"><b>Established:</b> ${establishedText}</p>
 
        <img
-    src="${photoUrl(SET_PATHS.cemeteries + encodeURIComponent(props.Cemetery_ID) + ".jpg")}"
+    src="${escapeHtml(photoUrl(SET_PATHS.cemeteries + encodeURIComponent(props.Cemetery_ID) + ".jpg"))}"
     alt="${escapeHtml(props.Cemetery_Name || "Cemetery")}"
     class="cemetery-popup-photo"
     data-cemetery-photo-id="${escapeHtml(props.Cemetery_ID)}"

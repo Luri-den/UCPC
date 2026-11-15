@@ -910,7 +910,7 @@ function outFiles() {
   photos.forEach((blob, path) => o.push([path, blob]));
   return o;
 }
-const dl = (n, t) => el("a", { href:URL.createObjectURL(new Blob([t])), download:n }).click();
+const dl = (n, t) => { const a = el("a", { href:URL.createObjectURL(new Blob([t])), download:n }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); };
 function clean() { dirty.clear(); photos.clear(); $("#save").disabled = true; $("#save").className = ""; }
 async function put(name, text) {
   if (dir) { let d = dir; const parts = name.split("/"); for (const q of parts.slice(0, -1)) d = await d.getDirectoryHandle(q, { create:true }); const w = await (await d.getFileHandle(parts.pop(), { create:true })).createWritable(); await w.write(text); await w.close(); }

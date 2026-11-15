@@ -801,97 +801,35 @@ const extensions = [
 ];
 
 
-const photoPaths = [];
-
-
-for (let i = 0; i <= 5; i++) {
-
-    const suffix =
-        i === 0
-            ? ""
-            : `-${i + 1}`;
-
-
-    extensions.forEach(
-        function(ext) {
-
-            photoPaths.push(
-                `${SET_PATHS.base}${SET_PATHS.cemeteries}${encodeURIComponent(cemeteryID)}${suffix}.${ext}`
-            );
-
-        }
-    );
-
-}
-
+// Photos are looked for one at a time: .jpg first (what the editor saves), the other types only if .jpg is missing,
+// and the search stops at the first number with no photo. A cemetery with no photos costs 5 quick checks, not 30.
 const validPhotos = [];
+const MAX_PHOTOS = 6;
 
-let completed = 0;
-   
-    // --------------------------------------------------------
-    // CHECK EACH PHOTO
-    // --------------------------------------------------------
-
-    photoPaths.forEach(
-        function(photoPath) {
-
-
-            const image =
-                new Image();
-
-
-            image.onload =
-                function() {
-
-
-                    validPhotos.push(
-                        photoPath
-                    );
-
-
-                    completed++;
-
-
-                    if (
-                        completed
-                        ===
-                        photoPaths.length
-                    ) {
-
-                        displayPhotos();
-
-                    }
-
-                };
-
-
-            image.onerror =
-                function() {
-
-
-                    completed++;
-
-
-                    if (
-                        completed
-                        ===
-                        photoPaths.length
-                    ) {
-
-                        displayPhotos();
-
-                    }
-
-                };
-
-
-            image.src =
-                photoPath;
-
-
+function photoPathFor(i, ext) {
+    const suffix = i === 0 ? "" : `-${i + 1}`;
+    return `${SET_PATHS.base}${SET_PATHS.cemeteries}${encodeURIComponent(cemeteryID)}${suffix}.${ext}`;
+}
+function probe(path) {
+    return new Promise(function (resolve) {
+        const image = new Image();
+        image.onload = function () { resolve(true); };
+        image.onerror = function () { resolve(false); };
+        image.src = path;
+    });
+}
+(async function findPhotos() {
+    for (let i = 0; i < MAX_PHOTOS; i++) {
+        let found = null;
+        for (const ext of extensions) {
+            const path = photoPathFor(i, ext);
+            if (await probe(path)) { found = path; break; }
         }
-    );
-
+        if (!found) { break; }
+        validPhotos.push(found);
+    }
+    displayPhotos();
+})();
 
     // --------------------------------------------------------
     // DISPLAY PHOTOS
