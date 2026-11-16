@@ -147,7 +147,9 @@ async function boot() {
 
   // the invite arrives once in the link (?invite=CODE), then lives on this phone
   const qs = new URLSearchParams(location.search), code = (qs.get("invite") || "").trim().toUpperCase();
-  if (code) { store.set("invite:" + AREA, JSON.stringify({ code, name: "" })); history.replaceState(null, "", location.pathname); }
+  const goCem = (qs.get("cemetery") || "").trim(), goMarker = (qs.get("marker") || "").trim();   // from "Survey This Cemetery" / "Update This Grave" on the map
+  if (code) store.set("invite:" + AREA, JSON.stringify({ code, name: "" }));
+  if (code || goCem) history.replaceState(null, "", location.pathname);
   try { invite = JSON.parse(store.get("invite:" + AREA) || "null"); } catch (e) { invite = null; }
 
   window.addEventListener("online", () => { netBadge(); sendPending(true); });
@@ -159,6 +161,15 @@ async function boot() {
   await pruneSent();
   showHome();
   sendPending(true);
+  const c = goCem && CEMS.find(x => x.id === goCem);
+  if (c) {
+    await startVisit(c);
+    if (goMarker) {
+      const st = stonesIn(c.id).find(x => x.id === goMarker);
+      if (st) newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st);
+      else toast("That grave isn't on the survey map yet. Use New to record it.");
+    }
+  } else if (goCem) toast("That cemetery isn't in the survey list.");
 }
 function netBadge() { $("net").textContent = navigator.onLine ? "Online" : "Offline"; }
 

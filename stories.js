@@ -23,6 +23,8 @@
   css.textContent = `
   html,body,button,input,select,textarea{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
   .st-sec{margin:14px 0 6px;padding-top:10px;border-top:1px solid #d8d2c6}
+  .st-svy{margin:12px 0 4px}.st-svy button{width:100%;min-height:44px;padding:8px 14px;border-radius:8px;border:0;background:var(--accent,#01796F)!important;color:#fff!important;font:inherit;font-weight:600;cursor:pointer}
+  .st-svy small{display:block;margin-top:4px;color:#5b6470;font-size:12.5px}
   .st-sec h3{margin:0 0 8px}
   .st-quote{font:italic 1.15em/1.45 Georgia,"Times New Roman",serif;margin:4px 0 12px;padding-left:12px;border-left:3px solid var(--accent,#01796F)}
   .st-item{margin:0 0 12px}
@@ -88,14 +90,49 @@
     if (/^(https?:|mailto:|tel:)/.test(href)) { a.target = "_blank"; a.rel = "noopener"; }
     group.append(a);
   }
+  // "Signed in as Sam (Lead)". The role and name come from the inbox (/whoami) and are remembered on this device.
+  const whoKey = "leadWho:" + AREA;
+  function signedAs(inv, lead) {
+    if (lead) {
+      let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
+      if (w && w.role === "owner") return "Signed in as a Manager";
+      if (w && w.name) return "Signed in as " + w.name + " (Lead)";
+      return "Signed in as a Lead";
+    }
+    if (inv) return "Signed in as " + (inv.name || "a surveyor") + " (Volunteer)";
+    return "Not signed in";
+  }
+  function learnWho(key) {
+    if (!key || !INBOX || !AREA) return;
+    fetch(INBOX + "/" + AREA + "/whoami", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
+      if (j && j.ok) { store.set(whoKey, JSON.stringify({ role: j.role, name: j.name || "" })); menu(); }
+    }).catch(() => {});
+  }
+  // Leads and managers survey too. The survey works with invites, so the first time a lead starts one,
+  // an invite in their own name is made quietly and kept on this device (it shows in the Surveyors list).
+  async function ensureInvite() {
+    const inv = invite(); if (inv && inv.code) return true;
+    const lead = store.get(leadKeyName); if (!lead || !INBOX || !AREA) return false;
+    let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
+    const name = (w && w.role === "lead" && w.name) ? w.name + " (lead)" : "Manager";
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
+      if (!j.ok || !j.code) { alert(j.error || "Couldn't start the survey. Try again."); return false; }
+      store.set(inviteKey, JSON.stringify({ code: j.code, name: j.name || name })); return true;
+    } catch (e) { alert("Couldn't reach the inbox. Check your connection."); return false; }
+  }
+  async function goSurvey(params) {
+    if (!(await ensureInvite())) return;
+    location.href = "survey.html" + (params ? "?" + new URLSearchParams(params).toString() : "");
+  }
   function menu() {
     if (!panel) return;
     const inv = invite(), lead = store.get(leadKeyName), signed = !!(inv || lead);
     group.textContent = "";
-    link("Volunteer / Lead Sign-In", signed ? "Signed in" : "Not signed in", "#", signed, openSignIn);
-    if (inv) link("Survey / Make Changes", "Signed in as " + (inv.name || "a surveyor"), "survey.html", true);
-    else if (lead) link("Invite Volunteers", "Show a QR code to sign someone up", "#", true, openSignIn);   // a lead doesn't need the "how to help" link
-    else { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
+    link("Volunteer / Lead Sign-In", signedAs(inv, lead), "#", signed, openSignIn);
+    if (inv || lead) link("Start a Survey", "Record cemeteries and graves, or update one from its card", "survey.html", true, () => goSurvey());
+    if (lead) link("Invite Volunteers", "Show a QR code to sign someone up", "#", true, openSignIn);   // a lead doesn't need the "how to help" link
+    if (!inv && !lead) { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
     if (lead) link("Review Changes and Additions", "Opens the editor", "editor.html", true);
     if (!group.parentNode) { const title = panel.querySelector(".menu-title"); title ? title.after(group) : panel.prepend(group); }
   }
@@ -114,7 +151,7 @@
       badge.textContent = "\u25CF " + j.total + " new for review"; badge.hidden = !j.total;
     }).catch(() => {});
   }
-  checkBadge(); setInterval(() => { if (!document.hidden) checkBadge(); }, 300000);
+  checkBadge(); if (store.get(leadKeyName) && !store.get(whoKey)) learnWho(store.get(leadKeyName)); setInterval(() => { if (!document.hidden) checkBadge(); }, 300000);
 
   const si = document.createElement("div");
   si.id = "si-modal"; si.className = "stm"; si.hidden = true; si.setAttribute("role", "dialog"); si.setAttribute("aria-modal", "true"); si.setAttribute("aria-labelledby", "si-title");
@@ -149,7 +186,7 @@
       : '<h3>County lead</h3><label for="si-key">Lead key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
     if (lead) {
       l("si-ed").onclick = () => { location.href = "editor.html"; };
-      l("si-lout").onclick = () => { store.set(leadKeyName, ""); drawSignIn(); menu(); checkBadge(); };
+      l("si-lout").onclick = () => { store.set(leadKeyName, ""); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); };
       const invite1 = async () => {
         const name = l("si-new").value.trim(), m = l("si-imsg");
         if (!name) { m.textContent = "Type their name first."; m.className = "msg err"; l("si-new").focus(); return; }
@@ -172,7 +209,7 @@
       try { const r = await fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } });
         if (r.status === 403) { m.textContent = "That lead key isn't right."; m.className = "msg err"; return; }
         const j = await r.json(); if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
-        store.set(leadKeyName, key); drawSignIn(); menu(); checkBadge();
+        store.set(leadKeyName, key); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); learnWho(key);
       } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
     };
   }
@@ -223,6 +260,12 @@
     ready.then(function () {
       if (lastTarget !== t || infoContent.querySelector('[data-st="1"]')) return;
       adding = true;
+      if ((invite() || store.get(leadKeyName)) && t.id && (t.type === "cemetery" || t.cemetery)) {
+        const isCem = t.type === "cemetery";
+        infoContent.insertAdjacentHTML("beforeend", '<div class="st-svy"><button type="button">' + (isCem ? "Survey This Cemetery" : "Update This Grave") +
+          '</button><small>' + (isCem ? "Opens the survey at this cemetery." : "Opens the survey at this grave: condition, inscription, photo or a corrected spot.") + "</small></div>");
+        infoContent.querySelector(".st-svy button").addEventListener("click", function () { goSurvey(isCem ? { cemetery: t.id } : { cemetery: t.cemetery, marker: t.id }); });
+      }
       infoContent.insertAdjacentHTML("beforeend", sectionHtml(t, storiesFor(t)));
       const b = infoContent.querySelector(".st-share"); if (b) b.addEventListener("click", function () { openForm(t); });
       setTimeout(function () { adding = false; }, 0);
