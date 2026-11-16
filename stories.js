@@ -62,6 +62,7 @@
   const invite = () => { try { return JSON.parse(store.get(inviteKey) || "null"); } catch (e) { return null; } };
   /* a block at the top of the map menu, so volunteers and the lead can find it:
        not signed in:  ○ Volunteer / Lead Sign-In (Not Signed In)   ○ Want to help with the surveys? Tap here!
+       lead signed in: ⦿ Sign-In  ⦿ Invite Volunteers  ⦿ Review Changes and Additions
        signed in:      ⦿ Volunteer / Lead Sign-In (Signed In)       ⦿ Survey / Make Changes (as Name)   ⦿ Review Changes and Additions (lead only) */
   const panel = document.getElementById("menu-panel");
   const group = document.createElement("div"); group.id = "vol-group";
@@ -93,6 +94,7 @@
     group.textContent = "";
     link("Volunteer / Lead Sign-In", signed ? "Signed in" : "Not signed in", "#", signed, openSignIn);
     if (inv) link("Survey / Make Changes", "Signed in as " + (inv.name || "a surveyor"), "survey.html", true);
+    else if (lead) link("Invite Volunteers", "Show a QR code to sign someone up", "#", true, openSignIn);   // a lead doesn't need the "how to help" link
     else { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
     if (lead) link("Review Changes and Additions", "Opens the editor", "editor.html", true);
     if (!group.parentNode) { const title = panel.querySelector(".menu-title"); title ? title.after(group) : panel.prepend(group); }
