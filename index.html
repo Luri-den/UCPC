@@ -5111,9 +5111,9 @@ map.on("load", function () {
         }
     });
 
-    const CSV_PATH = new URL(SET_FILES.cemeteries, document.baseURI).href;
+    const CSV_PATH = new URL(SET_FILES.cemeteries, document.baseURI).href + "?v=" + Date.now();
+    const INTERMENTS_CSV_PATH = new URL(SET_FILES.interments, document.baseURI).href + "?v=" + Date.now();
     const LAKE_CSV_PATH = LOST_SITES ? new URL(LOST_SITES.file, document.baseURI).href : "";
-    const INTERMENTS_CSV_PATH = new URL(SET_FILES.interments, document.baseURI).href;
 
     // ---- County or town outline ----
     map.addSource("county-area", {
