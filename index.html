@@ -2733,6 +2733,10 @@ function updateCemeteryFeatures() {
         type: "FeatureCollection",
         features: features
     });
+    const labelSource = map.getSource("cemetery-features-labels");
+    if (labelSource) {
+        labelSource.setData({ type: "FeatureCollection", features: features });
+    }
 
     const visibility = features.length ? "visible" : "none";
 
@@ -5174,6 +5178,12 @@ map.on("load", function () {
         type: "geojson",
         data: EMPTY_COLLECTION
     });
+    // Labels get their own copy of the data: if the label font fails to load, only the words are lost,
+    // never the entrance icons (a shared source would drop both).
+    map.addSource("cemetery-features-labels", {
+        type: "geojson",
+        data: EMPTY_COLLECTION
+    });
 
     map.addLayer({
         id: "cemetery-features-tap-layer",
@@ -5202,11 +5212,11 @@ map.on("load", function () {
     map.addLayer({
         id: "cemetery-features-label-layer",
         type: "symbol",
-        source: "cemetery-features-data",
+        source: "cemetery-features-labels",
         layout: {
             visibility: "none",
             "text-field": ["coalesce", ["get", "LABEL"], "Entrance"],
-            "text-font": ["Open Sans Regular"],
+            "text-font": ["Noto Sans Regular"],   // a font the glyph server above actually has
             "text-size": 11,
             "text-offset": [0, 1.45],
             "text-anchor": "top",
