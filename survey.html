@@ -78,6 +78,14 @@ details.more summary{min-height:48px;display:flex;align-items:center;font-weight
 .mid{width:16px;height:16px;border-radius:50%;background:#ffffffcc;border:2px solid #1f1b16}
 .pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#22c55e;border:3px solid #1f1b16;touch-action:none}
 .pin.moved{background:#f97316}
+.ent{width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid #01796F;touch-action:none;box-shadow:0 1px 4px #0006}
+.ent.sec{width:20px;height:20px;border-width:3px}
+.ent.changed{border-color:#f97316;background:#fff7ed}
+.ent.new{border-color:#22c55e;background:#f0fdf4}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -6px 24px #0005;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 4px}.sheet .row{margin-top:10px}.sheet button{flex:1}
+.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:14px 16px}.choice b{display:block;font-size:17px}.choice small{display:block;font-weight:normal;opacity:.85;margin-top:2px}
+.entrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e5e1d8}.entrow span{flex:1}.entrow.gone span{text-decoration:line-through;opacity:.6}
 </style>
 </head>
 <body>
@@ -245,6 +253,14 @@ function entryRow(e) {
 }
 function bar(buttons) { const b = $("barIn"); b.innerHTML = ""; buttons.forEach(x => b.append(x)); $("bar").classList.toggle("on", buttons.length > 0); }
 
+/* a small panel from the bottom of the screen: title, text, buttons. Returns a close function. */
+function sheet(title, text, buttons) {
+  document.querySelectorAll(".sheet").forEach(x => x.remove());
+  const sh = el("div", { class: "sheet", role: "dialog" }, [el("h3", { text: title }), text ? el("p", { class: "muted", text }) : null, el("div", { class: "row" }, buttons)]);
+  document.body.append(sh); return () => sh.remove();
+}
+const closeSheets = () => document.querySelectorAll(".sheet").forEach(x => x.remove());
+
 /* ---------------- choosing a cemetery ---------------- */
 let here = null;
 function pickCemetery() {
@@ -272,21 +288,25 @@ const miles = m => m < 160 ? Math.round(m * 3.28084) + " ft" : (m / 1609.344).to
 
 /* ---------------- a visit: the map plus the two kinds of entry ---------------- */
 async function startVisit(c) {
-  current = c; $("homeBtn").classList.remove("hidden");
+  current = c; $("homeBtn").classList.remove("hidden"); closeSheets();
+  if (map && map.getLayer("ents")) map.setFilter("ents", null);
   const m = $("main"); m.innerHTML = "";
   const slot = el("div", { class: "mapSlot" }); m.append(slot);
   await mountMap(slot); focusCemetery(c);
   const saved = (await DB.all()).filter(e => e.area === AREA && e.cemetery === c.id);
   const hasCem = saved.find(e => e.kind === "cemetery" && e.status !== "sent");
+  const choice = (title, sub, cls, fn) => el("button", { type: "button", class: "choice big" + (cls ? " " + cls : ""), onclick: fn }, [el("b", { text: title }), el("small", { text: sub })]);
   m.append(el("div", { class: "card" }, [
     el("h2", { text: c.name }),
-    el("button", { type: "button", class: "big", text: hasCem ? "Continue cemetery details" : "Cemetery details (entrance, boundary, fence, hazards)", onclick: () => hasCem ? openEntry(hasCem) : newEntry("cemetery", { type: "cemetery", id: c.id }) }),
-    el("h3", { style: "margin-top:12px", text: "Record a marker or something found" }),
-    el("button", { type: "button", class: "primary big", text: "Tap a marker already on the map", onclick: () => pickExisting() }),
-    el("button", { type: "button", class: "big", text: "New: use my location", onclick: async () => { try { const p = await locate(); newEntry("marker", { type: "new", id: "" }, p); } catch (e) { toast(e.message); } } }),
-    el("button", { type: "button", class: "big", text: "New: tap the map", onclick: () => tapMap("Tap where it is on the map.", ll => newEntry("marker", { type: "new", id: "" }, { ll, acc: null, how: "map" })) }),
-    el("p", { class: "muted", style: "margin-top:8px", text: saved.length ? saved.length + " saved here on this phone. Tip: tap a gray dot on the map to update that grave." : "Tip: tap a gray dot on the map to update that grave, or a ringed dot to move the main entrance. Green dots are ones you've added." })
-  ]));
+    choice(hasCem ? "Continue Editing the Cemetery" : "Edit the Cemetery", "Condition, fence, hazards, the boundary and the entrances", "", () => hasCem ? openEntry(hasCem) : newEntry("cemetery", { type: "cemetery", id: c.id })),
+    choice("Edit a Grave", "Tap a grave on the map to fix its details or move it", "primary", () => pickExisting()),
+    choice("Add a New Grave", "Something that isn't on the map yet", "", () => sheet("Add a new grave", "Where is it?", [
+      el("button", { type: "button", text: "Use my location", onclick: async () => { closeSheets(); try { const p = await locate(); newEntry("marker", { type: "new", id: "" }, p); } catch (er) { toast(er.message); } } }),
+      el("button", { type: "button", text: "Tap the map", onclick: () => { closeSheets(); tapMap("Tap where it is on the map.", ll => newEntry("marker", { type: "new", id: "" }, { ll, acc: null, how: "map" })); } }),
+      el("button", { type: "button", text: "Cancel", onclick: closeSheets })])),
+    el("p", { class: "muted", style: "margin-top:8px", text: (saved.length ? saved.length + " saved here on this phone. " : "") + "Tip: you can also tap a gray dot or an entrance on the map directly. Green dots are ones you've added." }),
+    el("button", { type: "button", class: "big", style: "margin-top:6px", text: "Cancel: back to the start", onclick: () => showHome() })
+]));
   bar([el("button", { type: "button", text: "Done with this cemetery", onclick: showHome })]);
 }
 
@@ -312,8 +332,20 @@ function pickExisting() {
   tapMap("Tap the marker you're recording.", ll => {
     let best = null; list.forEach(s => { const d = dist(ll, s.ll); if (!best || d < best.d) best = { s, d }; });
     if (!best || best.d > 25) { toast("No marker there. Zoom in and tap right on a gray dot."); return pickExisting(); }
-    newEntry("marker", { type: "marker", id: best.s.id }, { ll: best.s.ll, acc: null, how: "existing" }, best.s);
+    confirmGrave(best.s);
   });
+}
+// "Edit this grave?" with the names and years on record, so the right one is picked
+function graveRows(id) { return STONES.filter(r => String(r.MARKER_ID || r.PERSON_ID || "").trim() === id); }
+const yearOf = v => { const m = String(v || "").match(/\b(1[5-9]\d\d|20\d\d)\b/); return m ? m[1] : ""; };
+async function confirmGrave(st) {
+  const rows = graveRows(st.id);
+  const who = rows.map(r => { const n = [r["FIRST NAME"], r["LAST NAME"]].filter(Boolean).join(" ") || "Name unknown", y = [yearOf(r.BIRTH), yearOf(r.DEATH)]; return n + (y[0] || y[1] ? " (" + (y[0] || "?") + "\u2013" + (y[1] || "?") + ")" : ""); });
+  const draft = (await DB.all()).find(x => mine(x) && x.kind === "marker" && x.target && x.target.id === st.id && x.status === "draft");
+  sheet("Edit this grave?", (who.length ? who.join(", ") : "No names on record") + (draft ? ". You have unsaved changes to it on this phone." : ""), [
+    el("button", { type: "button", text: "No, pick another", onclick: () => { closeSheets(); pickExisting(); } }),
+    el("button", { type: "button", class: "primary", text: draft ? "Yes, continue" : "Yes, edit it", onclick: () => { closeSheets(); draft ? openEntry(draft) : newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st); } })
+  ]);
 }
 
 /* ---------------- the map ---------------- */
@@ -364,16 +396,12 @@ async function directTap(e) {
   const stone = hits.find(h => h.layer.id === "stones" && h.properties.id), ent = hits.find(h => h.layer.id === "ents" && h.properties.cid === current.id);
   if (stone) {
     const st = stonesIn(current.id).find(x => x.id === stone.properties.id);
-    if (st) return newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st);
+    if (st) return confirmGrave(st);
   }
   if (ent) {
-    if (ent.properties.size !== "primary") return toast("Extra entrances are changed in the editor for now. The main entrance is set in Cemetery details.", 5000);
     const saved = (await DB.all()).find(x => x.area === AREA && x.cemetery === current.id && x.kind === "cemetery" && x.status !== "sent");
     if (saved) await openEntry(saved); else await newEntry("cemetery", { type: "cemetery", id: current.id });
-    const q = document.querySelector('[data-q="entrance_point"]') || document.querySelector('[data-q="entrance_safe"]');
-    if (q) q.scrollIntoView({ behavior: "smooth", block: "center" });
-    toast(document.querySelector('[data-q="entrance_point"]') ? "Move the main entrance with Use my location or Tap the map, then Save."
-      : "Answer Yes here, then move the main entrance with Use my location or Tap the map, and Save.", 6000);
+    toast("Tap an entrance on the map to move, remove or change it. Drag to move. Then Save.", 6000);
   }
 }
 async function focusCemetery(c) {
@@ -427,6 +455,21 @@ const accText = g => g ? (g.how === "gps" ? "GPS, about " + Math.round(g.acc * 3
 async function newEntry(kind, target, where, stone) {
   const e = { id: uid(), area: AREA, kind, cemetery: current.id, target, where: where || null, answers: {}, status: "draft", created: new Date().toISOString(), updated: new Date().toISOString(), stoneNames: stone ? stone.names : [] };
   if (kind === "marker" && stone && stone.names.length) e.answers.readable = "Yes";
+  if (kind === "marker" && target.type === "marker") {          // an existing grave: start from what's on record
+    const rows = graveRows(target.id), a = e.answers;
+    a.people = rows.map(r => ({ first: r["FIRST NAME"] || "", last: r["LAST NAME"] || "", birth: r.BIRTH || "", death: r.DEATH || "", sex: r.SEX || "", _pid: r.PERSON_ID || "" }));
+    if (rows.some(r => r.VETERAN === "1")) a.veteran = "Yes";
+    if (rows.some(r => r.MAUS === "1")) a.feature_type = "Above-ground structure / mausoleum";
+    const row = rows.map(r => r.ROW || r.PLOT).find(Boolean); if (row) a.row_plot = row;
+    const ins = rows.map(r => r["ADDITIONAL INFORMATION ON STONE"]).find(Boolean); if (ins) a.inscription = ins;
+    a._orig = JSON.parse(JSON.stringify({ people: a.people, veteran: a.veteran || "", feature_type: a.feature_type || "", row_plot: a.row_plot || "", inscription: a.inscription || "" }));
+  }
+  if (kind === "cemetery") {                                    // its entrances as they are now, to move, add or remove
+    const f = BOUNDS.features.find(x => x.properties && String(x.properties.CEMETERY_ID) === current.id && Array.isArray(x.properties.ENTRANCES));
+    const list = f ? f.properties.ENTRANCES.filter(en => en && Array.isArray(en.coords)).map((en, i) => ({ label: en.label || "Entrance", size: en.size || "primary", coords: en.coords.slice(), _i: i })) : [];
+    e.answers.entrances = list; e.answers._entrances_orig = JSON.parse(JSON.stringify(list));
+  }
+  e.initial = JSON.stringify(e.answers);
   await DB.put(e); openEntry(e);
 }
 async function openEntry(e) {
@@ -451,7 +494,8 @@ const optionsOf = q => q.options || (q.optionsFrom && Q[q.optionsFrom]) || [];
 
 function renderForm(e) {
   clearHandles();
-  const m = $("main"), qs = Q.questions.filter(q => q.for === e.kind || q.for === "both");
+  const m = $("main"), qs = Q.questions.filter(q => (q.for === e.kind || q.for === "both") && !(e.answers.entrances && (q.id === "entrance_safe" || q.id === "entrance_point")))
+    .map(q => q.id === "entrance_photo" && e.answers.entrances ? Object.assign({}, q, { showIf: null }) : q);
   let box = $("formBox"); if (box) box.remove();
   box = el("div", { id: "formBox" });
   const head = el("div", { class: "card" }, [
@@ -472,14 +516,15 @@ function renderForm(e) {
   qs.forEach(q => { if (!visible(q, e.answers)) return; (q.level === "expanded" ? moreBody : core).append(question(q, e)); });
   if (moreBody.childNodes.length) { more.append(moreBody); core.append(more); }
   box.append(core);
+  if (e.kind === "cemetery" && e.answers.entrances) box.append(entranceCard(e));
   m.append(box);
-  if (e.kind === "cemetery") drawCemDraft(e);
+  if (e.kind === "cemetery") { drawCemDraft(e); drawEntrances(e); }
   else {
     setDraft(e.moved ? [{ type: "Feature", properties: { color: "#9ca3af" }, geometry: { type: "Point", coordinates: e.moved.from } }] : []);
     if (e.where) handle(e.where.ll, "pin" + (e.moved ? " moved" : ""), { label: "This marker. Drag to move it.", drag: ll => movePoint(e, ll) });
   }
   bar([
-    el("button", { type: "button", class: "danger", text: "Delete", onclick: async () => { if (!confirm("Delete this survey from the phone?")) return; await DB.del(e.id); toast("Deleted."); current ? startVisit(current) : showHome(); } }),
+    el("button", { type: "button", text: "Cancel", onclick: () => cancelEntry(e) }),
     el("button", { type: "button", class: "primary", text: "Save", onclick: () => finish(e) })
   ]);
 }
@@ -493,6 +538,52 @@ async function movePoint(e, ll, back) {
   await save(e); const y = window.scrollY; renderForm(e); window.scrollTo(0, y); refreshStones();
 }
 async function save(e) { e.updated = new Date().toISOString(); await DB.put(e); }
+// Cancel: leave without sending. Nothing changed: it just goes. Changes: ask before throwing them away.
+async function cancelEntry(e) {
+  stopMapModes(); closeSheets();
+  const same = e.initial != null && e.initial === JSON.stringify(e.answers) && !e.moved;
+  if (!same && !confirm("Throw away the changes in this survey?")) return;
+  await DB.del(e.id); current ? startVisit(current) : showHome();
+}
+
+/* ---------- entrances: tap one to move, delete or change it; tap the map to add one ---------- */
+const sameLL = (a, b) => a && b && Math.abs(a[0] - b[0]) < 1e-7 && Math.abs(a[1] - b[1]) < 1e-7;
+function entState(e, en) {
+  const o = en._i != null ? (e.answers._entrances_orig || [])[en._i] : null;
+  if (!o) return "new";
+  return sameLL(o.coords, en.coords) && o.size === en.size ? "" : "changed";
+}
+function entranceCard(e) {
+  const a = e.answers, card = el("div", { class: "card" }, [el("h3", { text: "Entrances" }),
+    el("p", { class: "muted", text: "Tap an entrance on the map, or here, to move it, remove it or make it the main one. Drag it to move it. There can be more than one main entrance." })]);
+  a.entrances.forEach((en, i) => {
+    const st = entState(e, en);
+    card.append(el("div", { class: "entrow" }, [el("span", { text: (en.size === "primary" ? "Main entrance" : "Other entrance") + (st === "new" ? " (new)" : st === "changed" ? " (changed)" : "") }),
+      el("button", { type: "button", class: "small", text: "Change", onclick: () => entranceMenu(e, i) })]));
+  });
+  const gone = (a._entrances_orig || []).filter((o, i) => !a.entrances.some(en => en._i === i));
+  gone.forEach(o => card.append(el("div", { class: "entrow gone" }, [el("span", { text: (o.size === "primary" ? "Main entrance" : "Other entrance") + " (removed)" }),
+    el("button", { type: "button", class: "small", text: "Undo", onclick: () => { a.entrances.push(JSON.parse(JSON.stringify(o)), ); a.entrances[a.entrances.length - 1]._i = a._entrances_orig.indexOf(o); changed(e, true); } })])));
+  card.append(el("div", { class: "row" }, [el("button", { type: "button", text: "Add an entrance", onclick: () => tapMap("Tap where the entrance is.", ll => { a.entrances.push({ label: "Entrance", size: a.entrances.some(x => x.size === "primary") ? "secondary" : "primary", coords: ll }); changed(e, true); }) })]));
+  return card;
+}
+function entranceMenu(e, i) {
+  const a = e.answers, en = a.entrances[i];
+  sheet(en.size === "primary" ? "Main entrance" : "Other entrance", "Drag it on the map to move it, or:", [
+    el("button", { type: "button", text: "Move", onclick: () => { closeSheets(); tapMap("Tap where this entrance really is.", ll => { en.coords = ll; changed(e, true); }); } }),
+    el("button", { type: "button", text: en.size === "primary" ? "Make Other" : "Make Main", onclick: () => { closeSheets(); en.size = en.size === "primary" ? "secondary" : "primary"; changed(e, true); } }),
+    el("button", { type: "button", class: "danger", text: "Remove", onclick: () => { closeSheets(); a.entrances.splice(i, 1); changed(e, true); } }),
+    el("button", { type: "button", text: "Cancel", onclick: closeSheets })
+  ]);
+}
+function drawEntrances(e) {
+  const a = e.answers;
+  if (map.getLayer("ents")) map.setFilter("ents", ["!=", ["get", "cid"], current.id]);   // the form's own entrance pins replace them
+  a.entrances.forEach((en, i) => {
+    const st = entState(e, en);
+    handle(en.coords, "ent" + (en.size === "primary" ? "" : " sec") + (st ? " " + st : ""), { label: "Entrance. Tap for choices, drag to move.", drag: ll => { en.coords = ll; changed(e, true); }, click: () => entranceMenu(e, i) });
+  });
+}
 let saveTimer = 0;
 function changed(e, rerender) { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(e), 300); if (rerender) { save(e).then(() => { const y = window.scrollY; renderForm(e); window.scrollTo(0, y); }); } }
 
@@ -652,6 +743,8 @@ function drawCemDraft(e) {
   }
   if (a.entrance_point) f.push({ type: "Feature", properties: { color: "#22c55e" }, geometry: { type: "Point", coordinates: a.entrance_point.ll } });
   (a.hazard_spots || []).forEach(h => f.push({ type: "Feature", properties: { color: "#ef4444" }, geometry: { type: "Point", coordinates: h.where.ll } }));
+  // entrances that were moved or removed: their old spots, faded
+  if (a.entrances) (a._entrances_orig || []).forEach((o, i) => { const now = a.entrances.find(en => en._i === i); if (!now || !sameLL(now.coords, o.coords)) f.push({ type: "Feature", properties: { color: "#d1d5db" }, geometry: { type: "Point", coordinates: o.coords } }); });
   setDraft(f);
 }
 

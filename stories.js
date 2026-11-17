@@ -248,7 +248,7 @@
         (s.TAG ? '<span class="st-tag">' + H(s.TAG) + "</span>" : "") + (s.SOURCE ? "<br>Source: " + H(s.SOURCE) : "") + "</div></div>";
     });
     if (!list.length) h += '<p class="st-meta">No stories yet. Do you know something about ' + (t.type === "cemetery" ? "this place" : "this person") + "?</p>";
-    if (INBOX && AREA) h += '<button type="button" class="st-share">Share a story or memory</button>';
+    if (INBOX && AREA) h += '<button type="button" class="st-share">Share a story or memory</button> <button type="button" class="st-share st-fix">Suggest a correction</button>';
     return h + "</div>";
   }
 
@@ -267,12 +267,13 @@
       adding = true;
       if ((invite() || store.get(leadKeyName)) && t.id && (t.type === "cemetery" || t.cemetery)) {
         const isCem = t.type === "cemetery";
-        infoContent.insertAdjacentHTML("beforeend", '<div class="st-svy"><button type="button">' + (isCem ? "Survey This Cemetery" : "Update This Grave") +
-          '</button><small>' + (isCem ? "Opens the survey at this cemetery." : "Opens the survey at this grave: condition, inscription, photo or a corrected spot.") + "</small></div>");
+        infoContent.insertAdjacentHTML("beforeend", '<div class="st-svy"><button type="button">' + (isCem ? "Edit This Cemetery" : "Edit This Grave") +
+          '</button><small>' + (isCem ? "Details, hazards, boundary and entrances. Changes are reviewed before they appear." : "Names, dates, condition, photo, or drag it to the right spot. Changes are reviewed before they appear.") + "</small></div>");
         infoContent.querySelector(".st-svy button").addEventListener("click", function () { goSurvey(isCem ? { cemetery: t.id } : { cemetery: t.cemetery, marker: t.id }); });
       }
       infoContent.insertAdjacentHTML("beforeend", sectionHtml(t, storiesFor(t)));
-      const b = infoContent.querySelector(".st-share"); if (b) b.addEventListener("click", function () { openForm(t); });
+      const b = infoContent.querySelector(".st-share:not(.st-fix)"); if (b) b.addEventListener("click", function () { openForm(t); });
+      const fx = infoContent.querySelector(".st-fix"); if (fx) fx.addEventListener("click", function () { openFix(t); });
       setTimeout(function () { adding = false; }, 0);
     });
   }).observe(infoContent, { childList: true });
@@ -372,4 +373,43 @@
       else { $("st-send").disabled = false; say(j.error || "The story couldn't be sent. Please try again.", true); }
     } catch (e) { $("st-send").disabled = false; saveDraft(); say("No connection to the inbox. Your story is saved on this device; try again in a moment.", true); }
   });
+
+  /* ---------- Suggest a correction: anyone can point out a mistake; a lead checks it and fixes the record ---------- */
+  const fix = document.createElement("div");
+  fix.id = "cr-modal"; fix.className = "stm"; fix.hidden = true; fix.setAttribute("role", "dialog"); fix.setAttribute("aria-modal", "true");
+  fix.innerHTML = '<div class="box"><h2>Suggest a correction</h2><p class="sub" id="cr-for"></p>' +
+    '<label for="cr-what">What is wrong?</label><textarea id="cr-what" maxlength="1000" placeholder="For example: the death year says 1856"></textarea>' +
+    '<label for="cr-should">What should it say?</label><textarea id="cr-should" maxlength="1000" placeholder="For example: 1858"></textarea>' +
+    '<label for="cr-how">How do you know? *</label><textarea id="cr-how" maxlength="1500" placeholder="For example: I read the stone in 2025, or it is in the family Bible, or the death certificate says so"></textarea>' +
+    '<label for="cr-name">Your name *</label><input type="text" id="cr-name" maxlength="100">' +
+    '<label for="cr-contact">Email or phone (optional, only the reviewer sees it)</label><input type="text" id="cr-contact" maxlength="150">' +
+    '<div class="msg" id="cr-msg" role="status"></div><div class="row"><button type="button" id="cr-cancel">Cancel</button><button type="button" class="go" id="cr-send">Send</button></div></div>';
+  document.body.appendChild(fix);
+  const cf = id => document.getElementById(id);
+  let fixTarget = null;
+  function openFix(t) {
+    fixTarget = t; ["cr-what", "cr-should", "cr-how", "cr-msg"].forEach(id => { const e = cf(id); if (e.tagName === "DIV") e.textContent = ""; else e.value = ""; });
+    cf("cr-for").textContent = "About: " + (t.label || t.id) + ". A volunteer checks every correction before anything changes.";
+    try { cf("cr-name").value = localStorage.getItem("story:name") || cf("cr-name").value; } catch (e) {}
+    fix.hidden = false; cf("cr-send").disabled = false; cf("cr-what").focus();
+  }
+  cf("cr-cancel").onclick = () => { fix.hidden = true; };
+  cf("cr-send").onclick = async () => {
+    const what = cf("cr-what").value.trim(), should = cf("cr-should").value.trim(), how = cf("cr-how").value.trim(), name = cf("cr-name").value.trim(), m = cf("cr-msg");
+    const err = t => { m.textContent = t; m.className = "msg err"; };
+    if (!what && !should) return err("Say what is wrong, or what it should say.");
+    if (!how) { cf("cr-how").focus(); return err("Please say how you know. It helps the reviewer check it."); }
+    if (!name) { cf("cr-name").focus(); return err("Please add your name."); }
+    const t = fixTarget, id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+    const data = { type: "correction", what, should, how, name, contact: cf("cr-contact").value.trim(), consent: true,
+      text: "Correction: " + (what || "") + (should ? " \u2192 " + should : "") + ". How they know: " + how,
+      cemetery: t.cemetery || (t.type === "cemetery" ? t.id : ""), person: t.person || "", label: t.label || "", page: location.href.split("?")[0] };
+    cf("cr-send").disabled = true; m.textContent = "Sending\u2026"; m.className = "msg";
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: t.type, id: t.id }, data, media: [], created: new Date().toISOString(), submitter: name }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { m.textContent = "Thank you! A volunteer will check it."; m.className = "msg ok"; setTimeout(() => { fix.hidden = true; }, 2200); }
+      else { cf("cr-send").disabled = false; err(j.error || "It couldn't be sent. Please try again."); }
+    } catch (e) { cf("cr-send").disabled = false; err("No connection right now. Please try again in a moment."); }
+  };
 })();

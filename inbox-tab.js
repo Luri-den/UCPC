@@ -171,6 +171,7 @@
   const whereOf = it => D(it)._where && D(it)._where.ll;
   function title(it) {
     const d = D(it), k = kindOf(it);
+    if (k === "story" && d.type === "correction") return "Correction" + (d.label ? " · " + d.label : "");
     if (k === "story") return "Story" + (d.person ? " about " + d.person : d.label ? " · " + d.label : "");
     if (k === "cemetery") return "Cemetery details";
     const p = (d.people || [])[0], who = p ? [p.first, p.last].filter(Boolean).join(" ") : "";
@@ -210,14 +211,20 @@
     if (!map.getSource("inbx")) {
       map.addSource("inbx", { type: "geojson", data: EMPTY });
       map.addLayer({ id: "inbx-fill", type: "fill", source: "inbx", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#facc15", "fill-opacity": 0.25 } });
-      map.addLayer({ id: "inbx-line", type: "line", source: "inbx", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#d97706", "line-width": 3, "line-dasharray": [2, 1] } });
+      map.addLayer({ id: "inbx-line", type: "line", source: "inbx", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": ["case", ["has", "old"], "#9ca3af", "#d97706"], "line-width": 3, "line-dasharray": [2, 1] } });
       map.addLayer({ id: "inbx-pt", type: "circle", source: "inbx", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 9, "circle-color": ["coalesce", ["get", "c"], "#f97316"], "circle-stroke-color": "#000", "circle-stroke-width": 2 } });
     }
     const f = [], pt = (c, color) => f.push({ type: "Feature", properties: { c: color }, geometry: { type: "Point", coordinates: c } });
     if (it) {
-      const d = D(it);
+      const d = D(it), c0 = cemOf(it);
       if (d.boundary && d.boundary.length >= 3) { const ring = d.boundary.map(p => p.ll); f.push({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring.concat([ring[0]])] } }); }
       if (d.entrance_point) pt(d.entrance_point.ll, "#16a34a");
+      if (Array.isArray(d.entrances)) {
+        const o = d._entrances_orig || [];
+        o.forEach((was, i) => { const now = d.entrances.find(en => en._i === i); if (!now || Math.abs(now.coords[0] - was.coords[0]) > 1e-7 || Math.abs(now.coords[1] - was.coords[1]) > 1e-7) pt(was.coords, "#d1d5db"); });
+        d.entrances.forEach(en => pt(en.coords, en._i == null ? "#22c55e" : "#0d9488"));
+      }
+      if (c0 && Array.isArray(d.boundary) && d.boundary.length >= 3) { const old = holderOf(c0.ID); if (old && old.geometry && old.geometry.type === "Polygon") f.push({ type: "Feature", properties: { old: 1 }, geometry: { type: "LineString", coordinates: old.geometry.coordinates[0] } }); }
       (d.hazard_spots || []).forEach(h => h.where && pt(h.where.ll, "#dc2626"));
       if (d._moved) { pt(d._moved.from, "#9ca3af"); f.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [d._moved.from, d._moved.to] } }); }
       if (whereOf(it)) pt(whereOf(it), "#f97316");
@@ -307,20 +314,28 @@
       if (d.hazards) opt("haz", "Set Hazards: " + d.hazards + (d.hazard_types ? " (" + d.hazard_types.join(", ") + ")" : ""));
       if (d.boundary && d.boundary.length >= 3) opt("bnd", (holderOf(c.ID) ? "Replace" : "Add") + " the boundary (" + d.boundary.length + " corners)");
       if (d.entrance_point) opt("ent", "Set the main entrance to the green dot");
+      if (Array.isArray(d.entrances)) entranceChanges(box, d, apply);
       if (refs.length) opt("pics", "Save ticked photos as cemetery photos");
       opt("date", "Set Survey Date to today");
     } else if (k === "marker") {
       box.append(el("h3", { textContent: "Approve will…" }));
       if (it.target_type === "marker") {
-        if (d._moved) opt("move", "Move marker " + it.target_id + " to the surveyed spot (" + feet(dist(d._moved.from, d._moved.to)) + ")");
-        if (d.veteran === "Yes") opt("vet", "Mark everyone on this stone as Veteran", false);
+        if (d._moved) opt("move", "Move marker " + it.target_id + " to the surveyed spot (" + feet(dist(d._moved.from, d._moved.to)) + "). Old spot: gray dot on the map.");
+        if (d._orig) recordChanges(box, d, apply);
+        else if (d.veteran === "Yes") opt("vet", "Mark everyone on this stone as Veteran", false);
         if (refs.length) opt("pics", "Save the first ticked photo as this grave's photo (replaces the old one)");
-        box.append(el("small", { textContent: "Names and dates on existing stones aren't changed automatically. Use Open in Graves to edit them by hand." }));
+        if (!d._orig) box.append(el("small", { textContent: "This survey came from an older version of the survey, so names and dates aren't compared. Use Open in Graves to edit them by hand." }));
       } else {
         const n = Math.max(1, (d.people || []).length);
         opt("add", "Add as a new marker with " + n + " " + (n === 1 ? "person" : "people") + (d.feature_type ? " (" + d.feature_type + ")" : ""));
         if (refs.length) opt("pics", "Save the first ticked photo as its grave photo");
       }
+    } else if (k === "story" && d.type === "correction") {
+      box.append(el("h3", { textContent: "Suggested correction" }),
+        el("div", { innerHTML: "<b>What is wrong:</b> " + H(d.what || "") + "<br><b>Should say:</b> " + H(d.should || "") + "<br><b>How they know:</b> " + H(d.how || "") +
+          "<br><b>From:</b> " + H(d.name || "") + (d.contact ? " \u00b7 " + H(d.contact) + " (private)" : ""), style: "font-size:13px;line-height:1.6" }),
+        el("small", { textContent: "Check it, make the change yourself (Open in Graves or Cemeteries), then press Approve to mark it done. Approving doesn't change the record by itself.", style: "display:block;color:#9a3412;font-weight:600;margin-top:6px" }));
+      storyEdit = { correction: true };
     } else if (k === "story") {
       const t = el("textarea", { style: "height:140px" }); t.value = d.text || "";
       const q = el("input", { placeholder: "Featured quote (optional, a short line from the story)" });
@@ -357,9 +372,71 @@
       el("button", { textContent: "Hold", title: "Keep it in the inbox's archive without publishing", onclick: () => decide(it, "held") }),
       el("button", { className: "bad", textContent: "Reject", onclick: () => { if (confirm("Reject this " + (k === "story" ? "story" : "survey") + "? It won't be published.")) decide(it, "rejected"); } })
     ]);
+    if (k === "story" && d.type === "correction" && it.target_type === "marker" && it.target_id) actions.append(el("button", { textContent: "Open in Graves", onclick: () => { const r = ints.find(x => x.MARKER_ID === it.target_id); if (r) { sel = r.CEMETERY_ID; selG = r; refresh(); tab("grv"); } } }));
     if (k === "marker" && it.target_type === "marker") actions.append(el("button", { textContent: "Open in Graves", onclick: () => { const r = ints.find(x => x.CEMETERY_ID === c.ID && x.MARKER_ID === it.target_id); if (r) { sel = c.ID; selG = r; refresh(); tab("grv"); } else say("That marker isn't in the graves list."); } }));
     box.append(actions);
     pane.append(box);
+  }
+  /* ---------- what a grave edit changes: before -> after, each with a tick box and a correctable new value ---------- */
+  const REMINDER = "Untick anything you don't want applied. You can correct the new values before approving.";
+  function recordChanges(box, d, apply) {
+    const o = d._orig, rec = apply._rec = [], list = el("div");
+    const nameOf = p => [p.first, p.last].filter(Boolean).join(" ") || "Unnamed";
+    const add = (ch, label, before, after, editable, onByDefault) => {
+      const cb = el("input", { type: "checkbox", checked: onByDefault !== false }), inp = editable ? el("input", { value: after, style: "flex:1;min-width:90px" }) : null;
+      ch.cb = cb; ch.inp = inp; rec.push(ch);
+      list.append(el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0;font-size:13px" }, [cb, el("span", { textContent: label + ":" }),
+        before !== null ? el("s", { textContent: before || "(blank)", style: "color:#9ca3af" }) : "", before !== null ? el("span", { textContent: "\u2192" }) : "", inp || el("b", { textContent: after })]));
+    };
+    const F = [["first", "FIRST NAME", "First name"], ["last", "LAST NAME", "Last name"], ["birth", "BIRTH", "Born"], ["death", "DEATH", "Died"], ["sex", "SEX", "Sex"]];
+    (o.people || []).forEach(op => {
+      const np = (d.people || []).find(x => x._pid && x._pid === op._pid);
+      if (!np) { add({ kind: "remove", pid: op._pid }, "Remove " + nameOf(op) + " from this stone (left unticked: removing is never automatic)", null, nameOf(op), false, false); return; }
+      F.forEach(([k, col, lab]) => { if (String(np[k] || "") !== String(op[k] || "")) add({ kind: "field", pid: op._pid, col }, lab + " (" + nameOf(op) + ")", op[k] || "", np[k] || "", true); });
+    });
+    (d.people || []).filter(x => !x._pid && (x.first || x.last || x.birth || x.death)).forEach(np => add({ kind: "addP", p: np }, "Add a person: " + nameOf(np) + (np.birth || np.death ? " (" + (np.birth || "?") + " \u2013 " + (np.death || "?") + ")" : ""), null, "", false));
+    if ((d.veteran || "") !== (o.veteran || "")) add({ kind: "all", col: "VETERAN", val: d.veteran === "Yes" ? "1" : "0" }, "Veteran", o.veteran || "not marked", d.veteran || "not marked", false);
+    if ((d.row_plot || "") !== (o.row_plot || "")) add({ kind: "all", col: "ROW" }, "Row / plot", o.row_plot, d.row_plot || "", true);
+    if ((d.inscription || "") !== (o.inscription || "")) add({ kind: "all", col: "ADDITIONAL INFORMATION ON STONE" }, "Inscription / notes", o.inscription, d.inscription || "", true);
+    const wasAbove = /Above-ground/.test(o.feature_type || ""), isAbove = /Above-ground/.test(d.feature_type || "");
+    if (wasAbove !== isAbove && d.feature_type) add({ kind: "all", col: "MAUS", val: isAbove ? "1" : "0" }, "Above-ground structure", wasAbove ? "yes" : "no", isAbove ? "yes" : "no", false);
+    if (!rec.length) { box.append(el("small", { textContent: "No changes to names, dates or details. Only what's ticked above (if anything) will change." })); return; }
+    box.append(el("h4", { textContent: "Changes to the record", style: "margin:10px 0 2px" }), el("small", { textContent: REMINDER, style: "display:block;color:#9a3412;font-weight:600" }), list);
+  }
+  function applyRecordChanges(apply, c, markerId) {
+    const rows = ints.filter(x => x.CEMETERY_ID === c.ID && x.MARKER_ID === markerId); if (!rows.length) return 0;
+    let n = 0;
+    (apply._rec || []).forEach(ch => {
+      if (!ch.cb.checked) return; n++;
+      const val = ch.inp ? ch.inp.value.trim() : ch.val;
+      if (ch.kind === "field") { const r = rows.find(x => x.PERSON_ID === ch.pid); if (r) { need(intF, [ch.col]); r[ch.col] = val; } }
+      else if (ch.kind === "all") { need(intF, [ch.col]); rows.forEach(r => r[ch.col] = val); }
+      else if (ch.kind === "remove") { const i = ints.findIndex(x => x.CEMETERY_ID === c.ID && x.PERSON_ID === ch.pid); if (i >= 0 && ints.filter(x => x.MARKER_ID === markerId).length > 1) ints.splice(i, 1); else n--; }
+      else if (ch.kind === "addP") {
+        const base = rows[0], used = new Set(ints.map(x => x.PERSON_ID)); let j = 0, pid; do { pid = markerId + String.fromCharCode(65 + j++); } while (used.has(pid));
+        const row = {}; intF.forEach(f => row[f] = ""); Object.assign(row, { CEMETERY_ID: c.ID, MARKER_ID: markerId, PERSON_ID: pid, "FIRST NAME": ch.p.first || "", "LAST NAME": ch.p.last || "Unknown", BIRTH: ch.p.birth || "", DEATH: ch.p.death || "", SEX: ch.p.sex || "",
+          LAT: base.LAT, LONG: base.LONG, VETERAN: base.VETERAN || "0", PIONEER: base.PIONEER || "0", MAUS: base.MAUS || "0" });
+        ints.push(row);
+      }
+    });
+    if (n) touch("ints");
+    return n;
+  }
+  /* ---------- entrances: the surveyed list replaces the old one, change by change ---------- */
+  function entranceChanges(box, d, apply) {
+    const o = d._entrances_orig || [], now = d.entrances || [], lines = [];
+    const same = (a, b) => a && b && Math.abs(a[0] - b[0]) < 1e-7 && Math.abs(a[1] - b[1]) < 1e-7;
+    const nm = e => e.size === "primary" ? "main entrance" : "other entrance";
+    now.forEach(en => {
+      const was = en._i != null ? o[en._i] : null;
+      if (!was) lines.push("Add a " + nm(en) + " (green ring)");
+      else { if (!same(was.coords, en.coords)) lines.push("Move a " + nm(was) + " " + feet(dist(was.coords, en.coords)) + " (gray: old spot)"); if (was.size !== en.size) lines.push("Change a " + nm(was) + " to " + nm(en)); }
+    });
+    o.forEach((was, i) => { if (!now.some(en => en._i === i)) lines.push("Remove a " + nm(was) + " (gray)"); });
+    if (!lines.length) return;
+    const cb = el("input", { type: "checkbox", checked: true }); apply.ents = cb;
+    box.append(el("label", { style: "font-weight:normal" }, [cb, " Update the entrances (" + now.length + " after):"]), el("ul", { style: "margin:2px 0 6px 18px;font-size:13px" }, lines.map(t => el("li", { textContent: t }))),
+      el("small", { textContent: REMINDER, style: "display:block;color:#9a3412;font-weight:600" }));
   }
   const holderOf = id => bounds.features.find(x => (x.properties || {}).CEMETERY_ID === id && !(x.properties.TYPE && x.properties.TYPE !== "BOUNDARY"));
   const need = (F, cols) => cols.forEach(f => { if (!F.includes(f)) F.push(f); });
@@ -373,7 +450,9 @@
     const d = D(it), k = kindOf(it), c = cemOf(it), on = key => apply[key] && apply[key].checked;
     const kept = photoRefs(it).filter(p => keepPhoto.get(p.ref) && keepPhoto.get(p.ref).checked);
     try {
-      if (k === "story") {
+      if (k === "story" && d.type === "correction") {
+        // nothing to publish: the lead made the change by hand; approving marks it done
+      } else if (k === "story") {
         if (!(await loadExtra("stories"))) return;
         let photoPath = "";
         if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photoPath = photoDir("stories") + it.id + ".jpg"; photos.set(photoPath, b); touch("photos"); } }
@@ -401,10 +480,11 @@
           if (on("haz")) { r.HAZARDS = d.hazards === "Yes" ? "1" : ""; r.HAZARD_DETAILS = d.hazards === "Yes" ? (d.hazard_types || []).filter(t => EDITOR_HAZ.includes(t)).join("; ") : ""; need(cemF, ["HAZARDS", "HAZARD_DETAILS"]); }
           if (on("date")) { r.SURVEY_DATE = today(); r.LAST_UPDATED = today(); need(cemF, ["SURVEY_DATE", "LAST_UPDATED"]); }
           touch("cem");
-          if (on("bnd") || on("ent")) {
+          if (on("bnd") || on("ent") || on("ents")) {
             sel = c.ID; const f = holder(c.ID, true);
             if (on("bnd")) { const ring = d.boundary.map(p => fix(p.ll)); f.geometry = { type: "Polygon", coordinates: [ring.concat([ring[0]])] }; }
-            if (on("ent")) { const list = f.properties.ENTRANCES = f.properties.ENTRANCES || [], main = list.find(e => (e.size || "primary") === "primary"); if (main) main.coords = fix(d.entrance_point.ll); else list.unshift({ label: "Entrance", size: "primary", coords: fix(d.entrance_point.ll) }); }
+            if (on("ents")) f.properties.ENTRANCES = (d.entrances || []).map(en => ({ label: en.label || "Entrance", size: en.size === "secondary" ? "secondary" : "primary", coords: fix(en.coords) }));
+            else if (on("ent")) { const list = f.properties.ENTRANCES = f.properties.ENTRANCES || [], main = list.find(e => (e.size || "primary") === "primary"); if (main) main.coords = fix(d.entrance_point.ll); else list.unshift({ label: "Entrance", size: "primary", coords: fix(d.entrance_point.ll) }); }
             touch("bounds");
           }
           if (on("pics") && kept.length) {
@@ -418,6 +498,7 @@
             const stone = ints.find(x => x.CEMETERY_ID === c.ID && x.MARKER_ID === it.target_id);
             if (stone && on("move") && d._moved) { const p = fix(d._moved.to); moveStone(stone, p[1], p[0]); touch("ints"); }
             if (stone && on("vet")) { sameStone(stone).forEach(x => x.VETERAN = "1"); touch("ints"); }
+            if (stone && apply._rec) applyRecordChanges(apply, c, it.target_id);
             if (on("pics") && kept.length) { const b = await mediaBlob(it, kept[0].ref); if (b) { photos.set(photoDir("graves") + it.target_id + "-1.jpg", b); touch("photos"); } }
           } else if (on("add") && ints.some(x => x.SURVEY_ID === it.id)) {
             say("This grave was already added from this survey (by you or another lead), so it wasn't added again.");
