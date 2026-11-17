@@ -285,7 +285,7 @@ async function startVisit(c) {
     el("button", { type: "button", class: "primary big", text: "Tap a marker already on the map", onclick: () => pickExisting() }),
     el("button", { type: "button", class: "big", text: "New: use my location", onclick: async () => { try { const p = await locate(); newEntry("marker", { type: "new", id: "" }, p); } catch (e) { toast(e.message); } } }),
     el("button", { type: "button", class: "big", text: "New: tap the map", onclick: () => tapMap("Tap where it is on the map.", ll => newEntry("marker", { type: "new", id: "" }, { ll, acc: null, how: "map" })) }),
-    el("p", { class: "muted", style: "margin-top:8px", text: saved.length ? saved.length + " saved here on this phone." : "Gray dots are markers already recorded. Green dots are ones you've added." })
+    el("p", { class: "muted", style: "margin-top:8px", text: saved.length ? saved.length + " saved here on this phone. Tip: tap a gray dot on the map to update that grave." : "Tip: tap a gray dot on the map to update that grave, or a ringed dot to move the main entrance. Green dots are ones you've added." })
   ]));
   bar([el("button", { type: "button", text: "Done with this cemetery", onclick: showHome })]);
 }
@@ -334,6 +334,8 @@ function mountMap(slot) {
       map.addSource("bounds", { type: "geojson", data: BOUNDS });
       map.addLayer({ id: "bounds-fill", type: "fill", source: "bounds", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.08 } });
       map.addLayer({ id: "bounds-line", type: "line", source: "bounds", paint: { "line-color": (S.colors && S.colors.boundary) || "#01796F", "line-width": 2.5 } });
+      map.addSource("ents", { type: "geojson", data: entranceData() });
+      map.addLayer({ id: "ents", type: "circle", source: "ents", paint: { "circle-radius": 9, "circle-color": "#ffffff", "circle-stroke-color": (S.colors && S.colors.boundary) || "#01796F", "circle-stroke-width": 4 } });
       map.addSource("stones", { type: "geojson", data: empty });
       map.addLayer({ id: "stones", type: "circle", source: "stones", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 3, 20, 9], "circle-color": ["case", ["get", "mine"], "#22c55e", "#e5e1d8"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 1.5 } });
       map.addSource("draft", { type: "geojson", data: empty });
@@ -342,12 +344,37 @@ function mountMap(slot) {
       map.addLayer({ id: "draft-pts", type: "circle", source: "draft", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": ["coalesce", ["get", "color"], "#facc15"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 2 } });
       ok();
     }));
-    map.on("click", e => { if (tapCb) { const cb = tapCb; clearTap(); cb([r6(e.lngLat.lng), r6(e.lngLat.lat)]); } });
+    map.on("click", e => { if (tapCb) { const cb = tapCb; clearTap(); cb([r6(e.lngLat.lng), r6(e.lngLat.lat)]); } else directTap(e); });
     NODES.cancel.onclick = stopMapModes;
     NODES.base.onclick = () => { aerial = !aerial; ["usgs", "indiana"].forEach(l => map.setLayoutProperty(l, "visibility", aerial ? "visible" : "none")); map.setLayoutProperty("osm", "visibility", aerial ? "none" : "visible"); NODES.base.textContent = aerial ? "Street map" : "Aerial"; };
   }
   setTimeout(() => map.resize(), 30);
   return mapReady;
+}
+// Entrances of every cemetery, from the boundaries file, as map points
+function entranceData() {
+  const feats = [];
+  BOUNDS.features.forEach(f => { const p = f.properties || {}; (p.ENTRANCES || []).forEach(en => { if (en && Array.isArray(en.coords)) feats.push({ type: "Feature", properties: { cid: String(p.CEMETERY_ID || ""), size: en.size || "primary" }, geometry: { type: "Point", coordinates: en.coords } }); }); });
+  return { type: "FeatureCollection", features: feats };
+}
+// On the cemetery screen, tapping a gray dot opens that grave, and tapping an entrance opens Cemetery details.
+async function directTap(e) {
+  if (!current || $("formBox")) return;
+  const p = e.point, hits = map.queryRenderedFeatures([[p.x - 14, p.y - 14], [p.x + 14, p.y + 14]], { layers: ["stones", "ents"] });
+  const stone = hits.find(h => h.layer.id === "stones" && h.properties.id), ent = hits.find(h => h.layer.id === "ents" && h.properties.cid === current.id);
+  if (stone) {
+    const st = stonesIn(current.id).find(x => x.id === stone.properties.id);
+    if (st) return newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st);
+  }
+  if (ent) {
+    if (ent.properties.size !== "primary") return toast("Extra entrances are changed in the editor for now. The main entrance is set in Cemetery details.", 5000);
+    const saved = (await DB.all()).find(x => x.area === AREA && x.cemetery === current.id && x.kind === "cemetery" && x.status !== "sent");
+    if (saved) await openEntry(saved); else await newEntry("cemetery", { type: "cemetery", id: current.id });
+    const q = document.querySelector('[data-q="entrance_point"]') || document.querySelector('[data-q="entrance_safe"]');
+    if (q) q.scrollIntoView({ behavior: "smooth", block: "center" });
+    toast(document.querySelector('[data-q="entrance_point"]') ? "Move the main entrance with Use my location or Tap the map, then Save."
+      : "Answer Yes here, then move the main entrance with Use my location or Tap the map, and Save.", 6000);
+  }
 }
 async function focusCemetery(c) {
   await mapReady; await refreshStones();
@@ -357,7 +384,7 @@ async function focusCemetery(c) {
 }
 async function refreshStones() {
   if (!map || !current) return; await mapReady;
-  const feats = stonesIn(current.id).map(s => ({ type: "Feature", properties: { mine: false }, geometry: { type: "Point", coordinates: s.ll } }))
+  const feats = stonesIn(current.id).map(s => ({ type: "Feature", properties: { mine: false, id: s.id }, geometry: { type: "Point", coordinates: s.ll } }))
     .concat((await sessionMarkers(current.id)).map(s => ({ type: "Feature", properties: { mine: true }, geometry: { type: "Point", coordinates: s.ll } })));
   map.getSource("stones").setData({ type: "FeatureCollection", features: feats });
 }
@@ -483,7 +510,7 @@ async function finish(e) {
 
 /* one question */
 function question(q, e) {
-  const a = e.answers, wrap = el("div", { class: "q-wrap" });
+  const a = e.answers, wrap = el("div", { class: "q-wrap" }); wrap.dataset.q = q.id;
   wrap.append(el("label", { class: "q" }, [document.createTextNode(q.label), q.required ? el("span", { class: "req", text: " *" }) : null]));
   if (q.help) wrap.append(el("div", { class: "help", text: q.help }));
   const set = (v, rerender) => { if (v == null || v === "" || (Array.isArray(v) && !v.length)) delete a[q.id]; else a[q.id] = v; changed(e, rerender); };
