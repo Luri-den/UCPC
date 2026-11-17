@@ -1,0 +1,2 @@
+VISIT_ID,DATE,CEMETERY_ID,TARGET_TYPE,TARGET_ID,SURVEYOR,SUMMARY,DATA
+59075819-4fdb-4d91-be95-599de0a62e8f,2026-11-17,UC002,cemetery,UC002,Manager,"condition Poor, hazards","{""first_visit"":""No"",""overall_condition"":""Poor"",""entrance_safe"":""Yes"",""entrance_point"":{""ll"":[-84.916726,39.630564],""acc"":null,""how"":""map""},""boundary_safe"":""No"",""fence"":""No"",""hazards"":""Yes"",""hazard_types"":[""Unstable / Uneven Ground"",""Heavy Brush / Roots""],""_cemetery"":""UC002"",""_where"":null,""_kind"":""cemetery"",""_form"":1}"
