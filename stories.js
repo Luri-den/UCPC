@@ -105,7 +105,7 @@
   function learnWho(key) {
     if (!key || !INBOX || !AREA) return;
     fetch(INBOX + "/" + AREA + "/whoami", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
-      if (j && j.ok) { store.set(whoKey, JSON.stringify({ role: j.role, name: j.name || "" })); menu(); }
+      if (j && j.ok) { store.set(whoKey, JSON.stringify({ role: j.role, name: j.name || "" })); menu(); const h = document.querySelector("#si-lead h3"); if (h && store.get(leadKeyName)) h.textContent = signedAs(null, store.get(leadKeyName)); }
     }).catch(() => {});
   }
   // Leads and managers survey too. The survey works with invites, so the first time a lead starts one,
@@ -157,7 +157,7 @@
   si.id = "si-modal"; si.className = "stm"; si.hidden = true; si.setAttribute("role", "dialog"); si.setAttribute("aria-modal", "true"); si.setAttribute("aria-labelledby", "si-title");
   si.innerHTML = `<div class="box"><h2 id="si-title">Volunteer & Lead Sign-In</h2>
     <p class="hint">For people helping record the cemeteries. Visitors don't need to sign in.</p>
-    <div id="si-vol"></div><hr><div id="si-lead"></div>
+    <div id="si-vol"></div><hr id="si-sep"><div id="si-lead"></div>
     <div class="row"><button type="button" id="si-close">Close</button></div></div>`;
   document.body.append(si);
   si.addEventListener("click", e => { if (e.target === si) si.hidden = true; });
@@ -166,9 +166,11 @@
   function section(box, html) { box.innerHTML = html; return id => box.querySelector("#" + id); }
   function drawSignIn() {
     const inv = invite(), lead = store.get(leadKeyName);
+    // a signed-in lead or manager only sees their own section, so "Invite" can't be mistaken for anything else
+    si.querySelector("#si-vol").hidden = !!lead; si.querySelector("#si-sep").hidden = !!lead;
     const v = section(si.querySelector("#si-vol"), inv
-      ? '<h3>Surveyor</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
-      : '<h3>Surveyor</h3><p class="hint">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears.</p><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">Or type the code from your invite link (the part after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
+      ? '<h3>Volunteer</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
+      : '<h3>Volunteer</h3><p class="hint">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears.</p><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">Or type the code from your invite link (the part after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
     if (inv) { v("si-go").onclick = () => { location.href = "survey.html"; }; v("si-out").onclick = () => { if (confirm("Sign out of surveying on this device? Surveys not yet sent stay saved on it.")) { store.set(inviteKey, ""); drawSignIn(); menu(); } }; }
     else v("si-in").onclick = async () => {
       const code = v("si-code").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = v("si-vmsg");
@@ -180,12 +182,15 @@
       } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
     };
     const l = section(si.querySelector("#si-lead"), lead
-      ? '<h3>County lead</h3><p class="ok">Lead key saved on this device. New additions show as a red badge on the map.</p>' +
-        '<label for="si-new">Invite a surveyor</label><input type="text" id="si-new" placeholder="Their name" autocomplete="off"><div class="row"><button type="button" class="go" id="si-inv">Invite and show QR code</button></div><div class="msg" id="si-imsg" role="status"></div>' +
+      ? '<h3>' + H(signedAs(null, lead)) + '</h3><p class="ok">New additions show as a red badge on the map.</p>' +
+        '<div class="row"><button type="button" class="go" id="si-svy">Start a Survey</button></div>' +
+        '<h3 style="margin-top:18px">Invite a new volunteer</h3><p class="hint">Type the volunteer\'s name, then let them scan the QR code with their phone\'s camera.</p>' +
+        '<label for="si-new">Volunteer\'s name</label><input type="text" id="si-new" placeholder="Their name" autocomplete="off"><div class="row"><button type="button" class="go" id="si-inv">Invite and show QR code</button></div><div class="msg" id="si-imsg" role="status"></div>' +
         '<div class="row"><button type="button" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
-      : '<h3>County lead</h3><label for="si-key">Lead key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
+      : '<h3>Lead or manager</h3><label for="si-key">Lead or manager key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
     if (lead) {
       l("si-ed").onclick = () => { location.href = "editor.html"; };
+      l("si-svy").onclick = () => goSurvey();
       l("si-lout").onclick = () => { store.set(leadKeyName, ""); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); };
       const invite1 = async () => {
         const name = l("si-new").value.trim(), m = l("si-imsg");
