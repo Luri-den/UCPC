@@ -5220,8 +5220,8 @@ map.on("load", function () {
             "text-size": 11,
             "text-offset": [0, 1.45],
             "text-anchor": "top",
-            "text-allow-overlap": true,
-            "text-ignore-placement": true
+            "text-allow-overlap": false,   // two entrances close together: show one label, not a jumble
+            "text-optional": true
         },
         paint: {
             "text-color": "#463a2d",

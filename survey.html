@@ -159,7 +159,7 @@ async function boot() {
   if (!invite) return showNoInvite();
   checkInvite();
   await pruneSent();
-  showHome();
+  await showHome();      // must finish before a cemetery screen opens, or it draws over it and takes the map away
   sendPending(true);
   const c = goCem && CEMS.find(x => x.id === goCem);
   if (c) {
@@ -208,6 +208,7 @@ function showNoInvite() {
 async function showHome() {
   current = null; stopMapModes(); $("homeBtn").classList.add("hidden");
   const all = (await DB.all()).filter(mine).sort((a, b) => b.updated.localeCompare(a.updated));
+  if (current) return;   // a cemetery visit opened while this was loading: leave it alone
   const pend = all.filter(e => e.status === "pending"), drafts = all.filter(e => e.status === "draft");
   const m = $("main"); m.innerHTML = "";
   if (invite && invite.revoked) { const w = el("div", { class: "card", style: "border-color:#e5b4b4" }); w.innerHTML = "<h3>Your invite is no longer active</h3><p>Surveys saved on this phone are kept. Contact " + contactLine() + " for a new invite.</p>"; m.append(w); }
