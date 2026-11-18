@@ -1459,7 +1459,7 @@ function showHoverLabel(text, coordinates, detail) {
         className: "map-hover-popup"
     });
    
-    const html = "<div>" + escapeHtml(text) + "</div>" +
+    const html = "<div><b>" + escapeHtml(text) + "</b></div>" +
         (detail ? '<div class="hover-detail">' + escapeHtml(detail) + "</div>" : "");
 
     hoverPopup.setLngLat(coordinates).setHTML(html).addTo(map);
@@ -5111,9 +5111,9 @@ map.on("load", function () {
         }
     });
 
-    const CSV_PATH = new URL(SET_FILES.cemeteries, document.baseURI).href + "?v=" + Date.now();
-    const INTERMENTS_CSV_PATH = new URL(SET_FILES.interments, document.baseURI).href + "?v=" + Date.now();
+    const CSV_PATH = new URL(SET_FILES.cemeteries, document.baseURI).href;
     const LAKE_CSV_PATH = LOST_SITES ? new URL(LOST_SITES.file, document.baseURI).href : "";
+    const INTERMENTS_CSV_PATH = new URL(SET_FILES.interments, document.baseURI).href;
 
     // ---- County or town outline ----
     map.addSource("county-area", {
@@ -5549,29 +5549,24 @@ map.on("load", function () {
             }
 
 
-           function cemeteryHoverDetail(props) {
-
-    const parts = [];
-
-    if (Number(props.Established_Year) > 0) {
-        parts.push("Established " + props.Established_Year);
-    }
+function cemeteryHoverDetail(props) {
+    // Line 1: other names. Line 2: (Est. YEAR · Last Burial: YEAR). Lines with nothing known are left out.
+    const lines = [];
+    const other = String(props.Other_Names || "").trim();
+    if (other && !/^none( known)?$/i.test(other)) { lines.push(other); }
 
     const rows = (intermentsByCemetery[cleanString(props.Cemetery_ID)] || {}).rows || [];
-    const years = [];
-
+    let last = 0;
     rows.forEach(function (person) {
         const match = String(person.death || "").match(/\b(1[5-9]\d\d|20\d\d)\b/);
-        if (match) { years.push(Number(match[1])); }
+        if (match && Number(match[1]) > last) { last = Number(match[1]); }
     });
+    const facts = [];
+    if (Number(props.Established_Year) > 0) { facts.push("Est. " + props.Established_Year); }
+    if (last) { facts.push("Last Burial: " + last); }
+    if (facts.length) { lines.push("(" + facts.join(" · ") + ")"); }
 
-    if (years.length) {
-        const first = Math.min.apply(null, years);
-        const last = Math.max.apply(null, years);
-        parts.push(first === last ? "Burial: " + first : "Burials: " + first + "–" + last);
-    }
-
-    return parts.join(" · ");
+    return lines.join("\n");
 }
 
             map.on("mouseenter", "graves-tap-layer", function (event) {

@@ -1,415 +1,828 @@
-/* stories.js - "Stories and memories" on the grave and cemetery cards, and the "Share a story" form.
-   Loaded by the map page (index.html) after its own script. It does not change the map; it only adds to the cards.
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#01796F">
+<title>Cemetery Survey</title>
+<link rel="manifest" href="survey-manifest.json">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+:root{--accent:#01796F;--accent-dark:#015a53;--ink:#1f1b16;--muted:#5f574c;--line:#d8d2c6;--bg:#f4f1e8;--card:#fff;--warn:#8a4b00;--bad:#9b1c1c;--ok:#1d6b3a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{position:sticky;top:0;z-index:20;background:var(--accent);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;padding-top:max(10px,env(safe-area-inset-top))}
+header h1{font-size:18px;margin:0;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{background:transparent;color:#fff;border:1px solid #ffffff88;border-radius:8px;padding:6px 10px;font:inherit;font-size:15px}
+#net{font-size:13px;padding:3px 8px;border-radius:999px;background:#ffffff26}
+main{max-width:640px;margin:0 auto;padding:12px 12px 120px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+h2{font-size:20px;margin:4px 0 10px;font-weight:600}
+h3{font-size:16px;margin:0 0 6px;font-weight:600}
+p{margin:0 0 10px}
+.muted{color:var(--muted);font-size:15px}
+button,.btn{font:inherit;min-height:48px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.big{width:100%;margin:6px 0;font-size:18px}
+button.small{min-height:40px;padding:6px 12px;font-size:15px}
+button.danger{color:var(--bad);border-color:#e5b4b4}
+button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 auto}
+input[type=text],input[type=number],input[type=search],input[type=date],textarea,select{width:100%;font:inherit;padding:12px;border:1px solid #b9b1a3;border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+label.q{display:block;font-weight:600;margin:0 0 6px}
+.q-wrap{padding:12px 0;border-top:1px solid #eee7da}
+.q-wrap:first-child{border-top:0}
+.help{font-size:14px;color:var(--muted);margin:-2px 0 8px}
+.req{color:var(--bad)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{min-height:46px;padding:9px 14px;border:1.5px solid #b9b1a3;border-radius:999px;background:#fff;font-size:16px}
+.opt.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.err{color:var(--bad);font-size:14px;margin-top:6px}
+#mapSlot,.mapSlot{height:46vh;min-height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:0 0 12px;position:relative}
+#map{position:absolute;inset:0}
+#mapBanner{position:absolute;z-index:5;left:8px;right:8px;top:8px;background:#1f1b16e6;color:#fff;border-radius:10px;padding:10px 12px;font-size:15px;display:none;align-items:center;gap:10px}
+#mapBanner.on{display:flex}
+#mapBanner span{flex:1}
+#mapBanner button{min-height:38px;background:#fff;color:var(--ink);border:0}
+#baseBtn{position:absolute;z-index:4;right:8px;bottom:28px;min-height:38px;padding:6px 10px;font-size:14px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs div{position:relative}
+.thumbs img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.thumbs button{position:absolute;top:-8px;right:-8px;min-height:30px;width:30px;padding:0;border-radius:50%;font-size:15px;background:#fff}
+.list{display:flex;flex-direction:column;gap:6px}
+.item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;text-align:left;width:100%}
+.item b{display:block}
+.item small{color:var(--muted)}
+.item .grow{flex:1;min-width:0}
+.pill{font-size:12px;padding:2px 8px;border-radius:999px;background:#eee7da;color:var(--muted);white-space:nowrap}
+.pill.pending{background:#fff1d6;color:var(--warn)}
+.pill.sent{background:#dcf1e3;color:var(--ok)}
+.pill.draft{background:#e8eef9;color:#28457a}
+details.more{margin-top:8px;border:1px dashed #b9b1a3;border-radius:10px;padding:0 12px}
+details.more summary{min-height:48px;display:flex;align-items:center;font-weight:600;cursor:pointer;color:var(--accent-dark)}
+.stack{display:flex;flex-direction:column;gap:6px}
+.sub{border:1px solid #eee7da;border-radius:10px;padding:10px;margin:8px 0;background:#fbfaf6}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--line);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:none}
+#bar.on{display:block}
+#bar .in{max-width:640px;margin:0 auto;display:flex;gap:8px}
+#bar .in>*{flex:1}
+#toast{position:fixed;z-index:50;left:50%;bottom:90px;transform:translateX(-50%);background:#1f1b16;color:#fff;padding:12px 16px;border-radius:10px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.hidden{display:none!important}
+.coord{font-size:14px;color:var(--muted)}
+.vtx{width:22px;height:22px;background:#facc15;border:3px solid #1f1b16;border-radius:4px;touch-action:none}
+.vtx.rm{background:#ef4444}
+.mid{width:16px;height:16px;border-radius:50%;background:#ffffffcc;border:2px solid #1f1b16}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#22c55e;border:3px solid #1f1b16;touch-action:none}
+.pin.moved{background:#f97316}
+.ent{width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid #01796F;touch-action:none;box-shadow:0 1px 4px #0006}
+.ent.sec{width:20px;height:20px;border-width:3px}
+.ent.changed{border-color:#f97316;background:#fff7ed}
+.ent.new{border-color:#22c55e;background:#f0fdf4}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -6px 24px #0005;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 4px}.sheet .row{margin-top:10px}.sheet button{flex:1}
+.choice{display:block;width:100%;text-align:left;margin:8px 0;padding:14px 16px}.choice b{display:block;font-size:17px}.choice small{display:block;font-weight:normal;opacity:.85;margin-top:2px}
+.entrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e5e1d8}.entrow span{flex:1}.entrow.gone span{text-decoration:line-through;opacity:.6}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Cemetery Survey</h1>
+  <span id="net">…</span>
+  <button id="homeBtn" type="button" class="hidden">Home</button>
+</header>
+<main id="main"><div class="card"><p>Loading…</p></div></main>
+<div id="bar"><div class="in" id="barIn"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="mapHome" class="hidden"><div id="map"></div><div id="mapBanner"><span id="mapBannerText"></span><button type="button" id="mapBannerCancel">Cancel</button></div><button type="button" id="baseBtn">Street map</button></div>
 
-   - Approved stories come from stories.csv (or settings.json files.stories). Columns:
-       STORY_ID, TARGET_TYPE (marker | cemetery), TARGET_ID, CEMETERY_ID, PERSON, TEXT, QUOTE, TOLD_BY, CONNECTION,
-       DATE_TOLD, TAG (Family account | Personal memory | Documented), SOURCE, PHOTO,
-       MEDIA (video or audio: links or files, separated by " | "; see media.js)
-     The editor writes this file when the lead approves a story. A missing file just means no stories yet.
-   - Shared stories go to the county inbox (settings.json "inbox") and wait there for the lead.
-   - The map page tells this file what a card shows by setting infoContent.dataset.storyFor just before it draws the card. */
-(function () {
-  "use strict";
-  if (typeof infoContent === "undefined") return;
-  const SETTINGS = (typeof SET !== "undefined" && SET) || {};
-  const AREA = String(SETTINGS.idPrefix || SETTINGS.shortName || "").toUpperCase();
-  const INBOX = String(SETTINGS.inbox || "").replace(/\/+$/, "");
-  const FILE = (SETTINGS.files && SETTINGS.files.stories) || "stories.csv";
-  const H = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const key = s => String(s == null ? "" : s).trim().toLowerCase();
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+"use strict";
+/* survey.html - the field survey for invited surveyors.
+   Works without signal: everything is saved on the phone first, and sent to the county inbox when there is signal.
+   Reads settings.json (county, colors, inbox address, lead contact) and survey.json (the questions). */
 
-  /* ---------- styles ---------- */
-  const css = document.createElement("style");
-  css.textContent = `
-  html,body,button,input,select,textarea{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-  .st-sec{margin:14px 0 6px;padding-top:10px;border-top:1px solid #d8d2c6}
-  .st-svy{margin:12px 0 4px}.st-svy button{width:100%;min-height:44px;padding:8px 14px;border-radius:8px;border:0;background:var(--accent,#01796F)!important;color:#fff!important;font:inherit;font-weight:600;cursor:pointer}
-  .st-svy small{display:block;margin-top:4px;color:#5b6470;font-size:12.5px}
-  .st-sec h3{margin:0 0 8px}
-  .st-quote{font:italic 1.15em/1.45 Georgia,"Times New Roman",serif;margin:4px 0 12px;padding-left:12px;border-left:3px solid var(--accent,#01796F)}
-  .st-item{margin:0 0 12px}
-  .st-item p{margin:0 0 4px;white-space:pre-wrap}
-  .st-meta{font-size:.85em;color:#5f574c}
-  .st-tag{display:inline-block;font-size:.75em;padding:1px 8px;border-radius:999px;background:#eee7da;color:#5f574c;margin-left:4px}
-  .st-item img{max-width:100%;border-radius:8px;margin:4px 0}
-  .st-share{min-height:44px;padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#01796F);background:#fff;color:var(--accent,#01796F);font:inherit;font-weight:600;cursor:pointer}
-  .stm{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
-  .stm[hidden]{display:none}
-  .stm .box{background:#fff;color:#1f1b16;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
-  @media(min-width:700px){.stm{align-items:center}.stm .box{border-radius:14px}}
-  .stm h2{margin:0 0 4px;font-size:1.2em}
-  .stm label{display:block;font-weight:600;margin:12px 0 4px}
-  .stm input[type=text],.stm input[type=email],.stm textarea,.stm select{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #b9b1a3;border-radius:8px}
-  .stm textarea{min-height:140px;resize:vertical}
-  .stm .hint{font-size:.85em;color:#5f574c;font-weight:400;margin:2px 0 0}
-  .stm .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px}
-  .stm .chk input{margin-top:4px;width:20px;height:20px;flex:none}
-  .stm .row{display:flex;gap:8px;margin-top:16px}
-  .stm .box,.stm .box *{text-shadow:none}
-  .stm input,.stm textarea,.stm select{color:#1f1b16!important;background:#fff!important}
-  .stm .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #8a8174!important;background:#fff!important;color:#1f1b16!important;box-shadow:none!important;text-transform:none;letter-spacing:normal}
-  .stm .row button.go{background:var(--accent,#01796F)!important;border-color:var(--accent,#01796F)!important;color:#fff!important}
-  .stm .row button:disabled{opacity:.55}
-  #lead-badge[hidden]{display:none!important}
-  .stm .ok{color:#1d6b3a}.stm hr{border:0;border-top:1px solid #e5dfd3;margin:16px 0}
-  .st-share{background:#fff!important;color:var(--accent,#01796F)!important;border:1px solid var(--accent,#01796F)!important}
-  .stm .msg{margin-top:10px;font-size:.95em}
-  .stm .msg.err{color:#9b1c1c}
-  .stm .thumb{max-width:120px;border-radius:8px;display:block;margin-top:6px}`;
-  document.head.append(css);
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const el = (tag, props, kids) => { const e = document.createElement(tag); if (props) for (const k in props) { if (k === "class") e.className = props[k]; else if (k === "text") e.textContent = props[k]; else if (k.startsWith("on")) e.addEventListener(k.slice(2), props[k]); else if (props[k] != null && props[k] !== false) e.setAttribute(k, props[k] === true ? "" : props[k]); } (kids || []).forEach(c => c != null && e.append(c)); return e; };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12)).replace(/[^A-Za-z0-9-]/g, "");
+const r6 = n => Math.round(n * 1e6) / 1e6;
+let toastTimer = 0;
+function toast(msg, ms) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), ms || 2800); }
 
-  /* ---------- signing in on the map: volunteers type their invite code, leads type the lead key ---------- */
-  const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };
-  const inviteKey = "invite:" + AREA, leadKeyName = "leadKey:" + AREA;
-  const invite = () => { try { return JSON.parse(store.get(inviteKey) || "null"); } catch (e) { return null; } };
-  /* a block at the top of the map menu, so volunteers and the lead can find it:
-       not signed in:  ○ Volunteer / Lead Sign-In (Not Signed In)   ○ Want to help with the surveys? Tap here!
-       lead signed in: ⦿ Sign-In  ⦿ Invite Volunteers  ⦿ Review Changes and Additions
-       signed in:      ⦿ Volunteer / Lead Sign-In (Signed In)       ⦿ Survey / Make Changes (as Name)   ⦿ Review Changes and Additions (lead only) */
-  const panel = document.getElementById("menu-panel");
-  const group = document.createElement("div"); group.id = "vol-group";
-  const gcss = document.createElement("style");
-  gcss.textContent = "#vol-group{margin:10px 0 12px;padding:8px;border:2px solid var(--accent,#01796F);border-radius:10px;background:#fff}" +
-    "#vol-group a{display:flex!important;align-items:center;gap:10px;min-height:44px;padding:4px 6px;color:var(--accent,#01796F);font-weight:600;text-decoration:none;border-radius:6px}" +
-    "#vol-group a:hover{background:#f1efe8}#vol-group a+a{border-top:1px solid #ebe6da}" +
-    "#vol-group .dot{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}" +
-    "#vol-group .dot.on{background:radial-gradient(circle,currentColor 0 4px,transparent 5px)}" +
-    "#vol-group small{display:block;font-weight:400;color:#5f574c;font-size:12px}";
-  document.head.append(gcss);
-  function helpTarget() {
-    const c = SETTINGS.contact || {};
-    if (c.form) return { href: c.form, how: "Fill in the volunteer form" };
-    if (c.email) return { href: "mailto:" + c.email + "?subject=" + encodeURIComponent("Helping with the " + (SETTINGS.name || "cemetery") + " survey"), how: "Email " + (c.name || c.email) };
-    if (c.phone) return { href: "tel:" + String(c.phone).replace(/[^0-9+]/g, ""), how: "Call " + (c.name || c.phone) };
-    return { href: "survey.html", how: "Find out how to get an invite" };
-  }
-  function link(text, sub, href, on, onclick) {
-    const a = document.createElement("a"); a.href = href;
-    a.innerHTML = '<span class="dot' + (on ? " on" : "") + '" aria-hidden="true"></span><span>' + H(text) + (sub ? "<small>" + H(sub) + "</small>" : "") + "</span>";
-    if (onclick) a.addEventListener("click", e => { e.preventDefault(); onclick(); });
-    if (/^(https?:|mailto:|tel:)/.test(href)) { a.target = "_blank"; a.rel = "noopener"; }
-    group.append(a);
-  }
-  // "Signed in as Sam (Lead)". The role and name come from the inbox (/whoami) and are remembered on this device.
-  const whoKey = "leadWho:" + AREA;
-  function signedAs(inv, lead) {
-    if (lead) {
-      let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
-      if (w && w.role === "owner") return "Signed in as a Manager";
-      if (w && w.name) return "Signed in as " + w.name + " (Lead)";
-      return "Signed in as a Lead";
+const DEFAULT_INBOX = "";   // the inbox address comes from settings.json ("inbox")
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+
+const NODES = { map: $("map"), banner: $("mapBanner"), bannerText: $("mapBannerText"), cancel: $("mapBannerCancel"), base: $("baseBtn") };
+let S = {}, Q = { questions: [] }, CEMS = [], STONES = [], BOUNDS = { type: "FeatureCollection", features: [] };
+let AREA = "", INBOX = "", invite = null;   // invite: { code, name }
+let current = null;                          // the cemetery being visited
+
+/* ---------------- the phone's own storage (IndexedDB): every survey lives here until the inbox confirms it ---------------- */
+const DB = {
+  db: null,
+  open() { return new Promise((ok, bad) => { const r = indexedDB.open("cemetery-survey", 1); r.onupgradeneeded = () => r.result.createObjectStore("entries", { keyPath: "id" }); r.onsuccess = () => { DB.db = r.result; ok(); }; r.onerror = () => bad(r.error); }); },
+  tx(mode) { return DB.db.transaction("entries", mode).objectStore("entries"); },
+  all() { return new Promise((ok, bad) => { const r = DB.tx("readonly").getAll(); r.onsuccess = () => ok(r.result || []); r.onerror = () => bad(r.error); }); },
+  put(e) { return new Promise((ok, bad) => { const r = DB.tx("readwrite").put(e); r.onsuccess = () => ok(); r.onerror = () => bad(r.error); }); },
+  del(id) { return new Promise((ok, bad) => { const r = DB.tx("readwrite").delete(id); r.onsuccess = () => ok(); r.onerror = () => bad(r.error); }); }
+};
+const mine = e => e.area === AREA;
+
+/* ---------------- loading the county's files ---------------- */
+async function getText(name) { const r = await fetch(new URL(name, document.baseURI).href, { cache: "no-cache" }); if (!r.ok) throw new Error(name + " not found"); return (await r.text()).replace(/^﻿/, ""); }
+async function getCsv(name) { try { return Papa.parse(await getText(name), { header: true, skipEmptyLines: "greedy" }).data; } catch (e) { return []; } }
+async function getJson(name, fallback) { try { return JSON.parse(await getText(name)); } catch (e) { return fallback; } }
+
+async function boot() {
+  try { await DB.open(); } catch (e) { $("main").innerHTML = '<div class="card"><h2>This browser can\'t save surveys</h2><p>Private browsing or a storage setting may be blocking it. Try a normal (not private) window.</p></div>'; return; }
+  S = await getJson("settings.json", {});
+  Q = await getJson("survey.json", { questions: [] });
+  AREA = String(S.idPrefix || S.shortName || "AREA").toUpperCase();
+  INBOX = String(S.inbox || DEFAULT_INBOX).replace(/\/+$/, "");
+  document.documentElement.style.setProperty("--accent", (S.colors && (S.colors.accent || S.colors.public)) || "#01796F");
+  $("title").textContent = S.name ? S.name + " Survey" : "Cemetery Survey";
+  document.title = $("title").textContent;
+  const files = S.files || {};
+  const [cems, stones, bounds] = await Promise.all([getCsv(files.cemeteries || "cemlist.csv"), getCsv(files.interments || "interments.csv"), getJson(files.boundaries || "cemetery-boundaries.geojson", null)]);
+  CEMS = cems.filter(r => r.ID && String(r.HIDE || "").trim() !== "1").map(r => ({ id: r.ID.trim(), name: r.NAME || r.ID, other: r.OTHER_NAMES || "", ll: [parseFloat(r.LONG), parseFloat(r.LAT)], township: r.TOWNSHIP || "" }));
+  STONES = stones; if (bounds && bounds.features) BOUNDS = bounds;
+
+  // the invite arrives once in the link (?invite=CODE), then lives on this phone
+  const qs = new URLSearchParams(location.search), code = (qs.get("invite") || "").trim().toUpperCase();
+  const goCem = (qs.get("cemetery") || "").trim(), goMarker = (qs.get("marker") || "").trim();   // from "Survey This Cemetery" / "Update This Grave" on the map
+  if (code) store.set("invite:" + AREA, JSON.stringify({ code, name: "" }));
+  if (code || goCem) history.replaceState(null, "", location.pathname);
+  try { invite = JSON.parse(store.get("invite:" + AREA) || "null"); } catch (e) { invite = null; }
+
+  window.addEventListener("online", () => { netBadge(); sendPending(true); });
+  window.addEventListener("offline", netBadge);
+  netBadge();
+  $("homeBtn").onclick = () => showHome();
+  if (!invite) return showNoInvite();
+  checkInvite();
+  await pruneSent();
+  await showHome();      // must finish before a cemetery screen opens, or it draws over it and takes the map away
+  sendPending(true);
+  const c = goCem && CEMS.find(x => x.id === goCem);
+  if (c) {
+    await startVisit(c);
+    if (goMarker) {
+      const st = stonesIn(c.id).find(x => x.id === goMarker);
+      if (st) newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st);
+      else toast("That grave isn't on the survey map yet. Use New to record it.");
     }
-    if (inv) return "Signed in as " + (inv.name || "a surveyor") + " (Volunteer)";
-    return "Not signed in";
-  }
-  function learnWho(key) {
-    if (!key || !INBOX || !AREA) return;
-    fetch(INBOX + "/" + AREA + "/whoami", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
-      if (j && j.ok) { store.set(whoKey, JSON.stringify({ role: j.role, name: j.name || "" })); menu(); const h = document.querySelector("#si-lead h3"); if (h && store.get(leadKeyName)) h.textContent = signedAs(null, store.get(leadKeyName)); }
-    }).catch(() => {});
-  }
-  // Leads and managers survey too. The survey works with invites, so the first time a lead starts one,
-  // an invite in their own name is made quietly and kept on this device (it shows in the Surveyors list).
-  async function ensureInvite() {
-    const inv = invite(); if (inv && inv.code) return true;
-    const lead = store.get(leadKeyName); if (!lead || !INBOX || !AREA) return false;
-    let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
-    const name = (w && w.role === "lead" && w.name) ? w.name + " (lead)" : "Manager";
-    try {
-      const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
-      if (!j.ok || !j.code) { alert(j.error || "Couldn't start the survey. Try again."); return false; }
-      store.set(inviteKey, JSON.stringify({ code: j.code, name: j.name || name })); return true;
-    } catch (e) { alert("Couldn't reach the inbox. Check your connection."); return false; }
-  }
-  async function goSurvey(params) {
-    if (!(await ensureInvite())) return;
-    location.href = "survey.html" + (params ? "?" + new URLSearchParams(params).toString() : "");
-  }
-  function menu() {
-    if (!panel) return;
-    const inv = invite(), lead = store.get(leadKeyName), signed = !!(inv || lead);
-    group.textContent = "";
-    link("Volunteer / Lead Sign-In", signedAs(inv, lead), "#", signed, openSignIn);
-    if (inv || lead) link("Start a Survey", "Record cemeteries and graves, or update one from its card", "survey.html", true, () => goSurvey());
-    if (lead) link("Invite Volunteers", "Show a QR code to sign someone up", "#", true, openSignIn);   // a lead doesn't need the "how to help" link
-    if (!inv && !lead) { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
-    if (lead) link("Review Changes and Additions", "Opens the editor", "editor.html", true);
-    if (!group.parentNode) { const title = panel.querySelector(".menu-title"); title ? title.after(group) : panel.prepend(group); }
-  }
-  if (INBOX && AREA) menu();
+  } else if (goCem) toast("That cemetery isn't in the survey list.");
+}
+function netBadge() { $("net").textContent = navigator.onLine ? "Online" : "Offline"; }
 
-  /* the lead's red badge: only in a browser where the lead key is saved */
-  const badge = document.createElement("a");
-  badge.href = "editor.html"; badge.id = "lead-badge"; badge.hidden = true;
-  badge.style.cssText = "position:fixed;z-index:9998;left:10px;top:calc(70px + env(safe-area-inset-top));background:#c62828;color:#fff;padding:8px 12px;border-radius:999px;font:600 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.3)";
-  badge.title = "Only you see this, because your lead key is saved in this browser.";
-  document.body.append(badge);
-  function checkBadge() {
-    const key = store.get(leadKeyName); if (!key || !INBOX || !AREA) { badge.hidden = true; return; }
-    fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
-      if (!j || !j.ok) { badge.hidden = true; return; }
-      badge.textContent = "\u25CF " + j.total + " new for review"; badge.hidden = !j.total;
-    }).catch(() => {});
-  }
-  checkBadge(); if (store.get(leadKeyName) && !store.get(whoKey)) learnWho(store.get(leadKeyName)); setInterval(() => { if (!document.hidden) checkBadge(); }, 300000);
+async function checkInvite() {   // quietly confirm the invite still works and learn the surveyor's name
+  if (!navigator.onLine || !invite) return;
+  try {
+    const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": invite.code } }), j = await r.json();
+    if (j.ok) { invite.name = j.name; store.set("invite:" + AREA, JSON.stringify(invite)); const g = $("greet"); if (g) g.textContent = "Signed in as " + j.name; }
+    else if (r.status === 403) { invite.revoked = true; showHome(); }
+  } catch (e) {}
+}
 
-  const si = document.createElement("div");
-  si.id = "si-modal"; si.className = "stm"; si.hidden = true; si.setAttribute("role", "dialog"); si.setAttribute("aria-modal", "true"); si.setAttribute("aria-labelledby", "si-title");
-  si.innerHTML = `<div class="box"><h2 id="si-title">Volunteer & Lead Sign-In</h2>
-    <p class="hint">For people helping record the cemeteries. Visitors don't need to sign in.</p>
-    <div id="si-vol"></div><hr id="si-sep"><div id="si-lead"></div>
-    <div class="row"><button type="button" id="si-close">Close</button></div></div>`;
-  document.body.append(si);
-  si.addEventListener("click", e => { if (e.target === si) si.hidden = true; });
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && !si.hidden) si.hidden = true; });
-  si.querySelector("#si-close").addEventListener("click", () => { si.hidden = true; });
-  function section(box, html) { box.innerHTML = html; return id => box.querySelector("#" + id); }
-  function drawSignIn() {
-    const inv = invite(), lead = store.get(leadKeyName);
-    // a signed-in lead or manager only sees their own section, so "Invite" can't be mistaken for anything else
-    si.querySelector("#si-vol").hidden = !!lead; si.querySelector("#si-sep").hidden = !!lead;
-    const v = section(si.querySelector("#si-vol"), inv
-      ? '<h3>Volunteer</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
-      : '<h3>Volunteer</h3><p class="hint">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears.</p><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">Or type the code from your invite link (the part after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
-    if (inv) { v("si-go").onclick = () => { location.href = "survey.html"; }; v("si-out").onclick = () => { if (confirm("Sign out of surveying on this device? Surveys not yet sent stay saved on it.")) { store.set(inviteKey, ""); drawSignIn(); menu(); } }; }
-    else v("si-in").onclick = async () => {
-      const code = v("si-code").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = v("si-vmsg");
-      if (!code) { m.textContent = "Type your invite code."; m.className = "msg err"; return; }
-      m.textContent = "Checking…"; m.className = "msg";
-      try { const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": code } }), j = await r.json();
-        if (!j.ok) { m.textContent = j.error || "That code didn't work."; m.className = "msg err"; return; }
-        store.set(inviteKey, JSON.stringify({ code, name: j.name })); drawSignIn(); menu();
-      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
-    };
-    const l = section(si.querySelector("#si-lead"), lead
-      ? '<h3>' + H(signedAs(null, lead)) + '</h3><p class="ok">New additions show as a red badge on the map.</p>' +
-        '<div class="row"><button type="button" class="go" id="si-svy">Start a Survey</button></div>' +
-        '<h3 style="margin-top:18px">Invite a new volunteer</h3><p class="hint">Type the volunteer\'s name, then let them scan the QR code with their phone\'s camera.</p>' +
-        '<label for="si-new">Volunteer\'s name</label><input type="text" id="si-new" placeholder="Their name" autocomplete="off"><div class="row"><button type="button" class="go" id="si-inv">Invite and show QR code</button></div><div class="msg" id="si-imsg" role="status"></div>' +
-        '<div class="row"><button type="button" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
-      : '<h3>Lead or manager</h3><label for="si-key">Lead or manager key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
-    if (lead) {
-      l("si-ed").onclick = () => { location.href = "editor.html"; };
-      l("si-svy").onclick = () => goSurvey();
-      l("si-lout").onclick = () => { store.set(leadKeyName, ""); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); };
-      const invite1 = async () => {
-        const name = l("si-new").value.trim(), m = l("si-imsg");
-        if (!name) { m.textContent = "Type their name first."; m.className = "msg err"; l("si-new").focus(); return; }
-        m.textContent = "Making the invite…"; m.className = "msg";
-        try {
-          const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
-          if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
-          await needQR();
-          l("si-new").value = ""; m.textContent = "Invited " + j.name + "."; m.className = "msg ok";
-          QR.show({ title: "Welcome, " + j.name + "!", sub: "Scan with your phone's camera to start surveying", link: new URL("survey.html?invite=" + encodeURIComponent(j.code), document.baseURI).href, onNext: () => { l("si-new").focus(); } });
-        } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
-      };
-      l("si-inv").onclick = invite1;
-      l("si-new").addEventListener("keydown", e => { if (e.key === "Enter") invite1(); });
-    }
-    else l("si-lin").onclick = async () => {
-      const key = l("si-key").value.trim(), m = l("si-lmsg");
-      if (!key) { m.textContent = "Type the lead key."; m.className = "msg err"; return; }
-      m.textContent = "Checking…"; m.className = "msg";
-      try { const r = await fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } });
-        if (r.status === 403) { m.textContent = "That lead key isn't right."; m.className = "msg err"; return; }
-        const j = await r.json(); if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
-        store.set(leadKeyName, key); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); learnWho(key);
-      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
-    };
-  }
-  let qrReady = null;
-  const needQR = () => qrReady || (qrReady = window.QR ? Promise.resolve() : new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "qr.js"; sc.onload = ok; sc.onerror = () => bad(new Error("qr.js missing")); document.head.append(sc); }));
-  function openSignIn() { drawSignIn(); si.hidden = false; const f = si.querySelector("input"); if (f) f.focus(); }
-
-  /* ---------- approved stories ---------- */
-  let STORIES = [];
-  function parseCsv(text) {
-    if (window.Papa) return Papa.parse(text.replace(/^﻿/, ""), { header: true, skipEmptyLines: "greedy" }).data;
-    return [];
-  }
-  const ready = fetch(new URL(FILE, document.baseURI).href, { cache: "no-cache" })
-    .then(r => r.ok ? r.text() : "").then(t => { STORIES = t ? parseCsv(t) : []; }).catch(() => { STORIES = []; });
-
-  function storiesFor(t) {
-    return STORIES.filter(s => key(s.TARGET_TYPE) === key(t.type) && key(s.TARGET_ID) === key(t.id) && String(s.TEXT || "").trim());
-  }
-  function sectionHtml(t, list) {
-    const featured = list.find(s => String(s.QUOTE || "").trim());
-    let h = '<div class="st-sec" data-st="1"><h3>Stories and memories' + (list.length ? " (" + list.length + ")" : "") + "</h3>";
-    if (featured) h += '<blockquote class="st-quote">“' + H(featured.QUOTE) + "”</blockquote>";
-    list.forEach(s => {
-      const who = [s.TOLD_BY, s.CONNECTION].filter(x => String(x || "").trim()).join(", ");
-      h += '<div class="st-item">' + (s.PERSON && t.type === "marker" ? '<div class="st-meta"><b>About ' + H(s.PERSON) + "</b></div>" : "") +
-        "<p>" + H(s.TEXT) + "</p>" +
-        (s.PHOTO ? '<img src="' + H(typeof photoUrl === "function" ? photoUrl(s.PHOTO) : s.PHOTO) + '" alt="Photo shared with this story" loading="lazy">' : "") +
-        (s.MEDIA && window.StoryMedia ? StoryMedia.html(s.MEDIA) : "") +
-        '<div class="st-meta">' + (who ? "Shared by " + H(who) : "Shared anonymously") + (s.DATE_TOLD ? " · " + H(s.DATE_TOLD) : "") +
-        (s.TAG ? '<span class="st-tag">' + H(s.TAG) + "</span>" : "") + (s.SOURCE ? "<br>Source: " + H(s.SOURCE) : "") + "</div></div>";
-    });
-    if (!list.length) h += '<p class="st-meta">No stories yet. Do you know something about ' + (t.type === "cemetery" ? "this place" : "this person") + "?</p>";
-    if (INBOX && AREA) h += '<button type="button" class="st-share">Share a story or memory</button> <button type="button" class="st-share st-fix">Suggest a correction</button>';
-    return h + "</div>";
-  }
-
-  /* add the section whenever a card that asked for it is drawn */
-  let adding = false, lastTarget = null;
-  new MutationObserver(function () {
-    if (adding) return;
-    const raw = infoContent.dataset.storyFor;
-    if (!raw) { lastTarget = null; return; }
-    delete infoContent.dataset.storyFor;                 // one card, one section
-    let t; try { t = JSON.parse(raw); } catch (e) { return; }
-    if (!t || !t.id) return;
-    lastTarget = t;
-    ready.then(function () {
-      if (lastTarget !== t || infoContent.querySelector('[data-st="1"]')) return;
-      adding = true;
-      if ((invite() || store.get(leadKeyName)) && t.id && (t.type === "cemetery" || t.cemetery)) {
-        const isCem = t.type === "cemetery";
-        infoContent.insertAdjacentHTML("beforeend", '<div class="st-svy"><button type="button">' + (isCem ? "Edit This Cemetery" : "Edit This Grave") +
-          '</button><small>' + (isCem ? "Details, hazards, boundary and entrances. Changes are reviewed before they appear." : "Names, dates, condition, photo, or drag it to the right spot. Changes are reviewed before they appear.") + "</small></div>");
-        infoContent.querySelector(".st-svy button").addEventListener("click", function () { goSurvey(isCem ? { cemetery: t.id } : { cemetery: t.cemetery, marker: t.id }); });
-      }
-      infoContent.insertAdjacentHTML("beforeend", sectionHtml(t, storiesFor(t)));
-      const b = infoContent.querySelector(".st-share:not(.st-fix)"); if (b) b.addEventListener("click", function () { openForm(t); });
-      const fx = infoContent.querySelector(".st-fix"); if (fx) fx.addEventListener("click", function () { openFix(t); });
-      setTimeout(function () { adding = false; }, 0);
-    });
-  }).observe(infoContent, { childList: true });
-
-  /* ---------- the Share a Story form ---------- */
-  const modal = document.createElement("div");
-  modal.id = "st-modal"; modal.className = "stm"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true"); modal.setAttribute("aria-labelledby", "st-title");
-  modal.innerHTML = `<div class="box">
-    <h2 id="st-title">Share a story or memory</h2><p class="hint" id="st-about"></p>
-    <label for="st-text">Your story, memory or information <span aria-hidden="true">*</span></label>
-    <textarea id="st-text" maxlength="8000" placeholder="She kept bees behind the house on the old Liberty road..."></textarea>
-    <label for="st-type">What kind is it?</label>
-    <select id="st-type"><option>Family story</option><option>Personal memory</option><option>Documented (from a record or newspaper)</option></select>
-    <div id="st-srcwrap" hidden><label for="st-src">Where is it from?</label><input type="text" id="st-src" maxlength="300" placeholder="Liberty Herald, June 3, 1901"></div>
-    <label for="st-name">Your name</label><input type="text" id="st-name" maxlength="120" autocomplete="name"><p class="hint">Shown with the story. Leave blank to share anonymously.</p>
-    <label for="st-conn">Your connection</label><input type="text" id="st-conn" maxlength="120" placeholder="Great-granddaughter, neighbor, historian…">
-    <label for="st-teller">Who told it, if not you</label><input type="text" id="st-teller" maxlength="120">
-    <label for="st-photo">A photo (optional)</label><input type="file" id="st-photo" accept="image/*"><img id="st-thumb" class="thumb" alt="" hidden>
-    <label for="st-audio">A recording (optional)</label><input type="file" id="st-audio" accept="audio/*"><p class="hint" id="st-audiohint">A short voice recording, up to about 2 minutes. For anything longer, or for video, use the link box below.</p>
-    <label for="st-link">A link to a video or recording (optional)</label><input type="text" id="st-link" maxlength="300" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…"><p class="hint">YouTube, Vimeo, or a link to an audio or video file.</p>
-    <label for="st-contact">Email or phone (optional)</label><input type="text" id="st-contact" maxlength="160" autocomplete="email"><p class="hint">Only the county's reviewer sees this, in case they have a question. It is never shown.</p>
-    <label class="chk"><input type="checkbox" id="st-consent"><span>I have the right to share this, including permission from anyone recorded or quoted, and I agree it may be shown on this site and kept in the county archive.</span></label>
-    <p class="hint">A volunteer reviews every story before it appears. Stories about living people, or with private details, may be kept in the archive without being shown.</p>
-    <div class="row"><button type="button" id="st-cancel">Cancel</button><button type="button" class="go" id="st-send">Send</button></div>
-    <div class="msg" id="st-msg" role="status" aria-live="polite"></div></div>`;
-  document.body.append(modal);
-  const $ = id => document.getElementById(id);
-  let target = null, photoData = null, audioData = null, lastFocus = null;
-  const AUDIO_OK = /^audio\/(webm|mp4|mpeg|ogg|aac|x-m4a)$/, AUDIO_MAX = 1400000;   // what the inbox accepts
-  $("st-audio").addEventListener("change", function () {
-    const f = this.files && this.files[0]; audioData = null; if (!f) return;
-    const mime = String(f.type || "").split(";")[0].toLowerCase();
-    if (!AUDIO_OK.test(mime)) { this.value = ""; return say("That kind of recording can't be sent here. Try an .mp3 or .m4a file, or put it online and paste the link below.", true); }
-    if (f.size > AUDIO_MAX) { this.value = ""; return say("That recording is too long to send here (the limit is about 2 minutes). Put it on YouTube or another site and paste the link below.", true); }
-    const r = new FileReader();
-    r.onload = function () { const m = /^data:[^,]*;base64,(.*)$/.exec(String(r.result)); if (m) { audioData = { mime: mime, data: m[1] }; say(""); } };
-    r.onerror = function () { say("That recording couldn't be read.", true); };
-    r.readAsDataURL(f);
-  });
-
-  $("st-type").addEventListener("change", function () { $("st-srcwrap").hidden = !/^Documented/.test(this.value); });
-  $("st-cancel").addEventListener("click", closeForm);
-  modal.addEventListener("click", function (e) { if (e.target === modal) closeForm(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !modal.hidden) closeForm(); });
-  $("st-photo").addEventListener("change", async function () {
-    const f = this.files && this.files[0]; photoData = null; $("st-thumb").hidden = true;
-    if (!f) return;
-    try { photoData = await shrink(f, 1600); $("st-thumb").src = photoData; $("st-thumb").hidden = false; } catch (e) { say(e.message, true); }
-  });
-
-  function shrink(file, max) {
-    return new Promise(function (ok, bad) {
-      const url = URL.createObjectURL(file), img = new Image();
-      img.onload = function () {
-        const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
-        c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-        let q = 0.82, out = c.toDataURL("image/jpeg", q); while (out.length > 1800000 && q > 0.4) { q -= 0.12; out = c.toDataURL("image/jpeg", q); }
-        ok(out);
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); bad(new Error("That photo couldn't be read.")); };
-      img.src = url;
-    });
-  }
-  function say(t, err) { const m = $("st-msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); }
-  function draftKey() { return "story-draft:" + AREA + ":" + (target ? target.type + ":" + target.id : ""); }
-  function openForm(t) {
-    target = t; lastFocus = document.activeElement; photoData = null; audioData = null; $("st-audio").value = "";
-    $("st-about").textContent = "About: " + (t.label || t.id);
-    let d = {}; try { d = JSON.parse(localStorage.getItem(draftKey()) || "{}"); } catch (e) {}
-    $("st-text").value = d.text || ""; $("st-name").value = d.name || ""; $("st-conn").value = d.connection || ""; $("st-teller").value = d.teller || "";
-    $("st-contact").value = d.contact || ""; $("st-src").value = d.source || ""; $("st-link").value = d.link || ""; $("st-consent").checked = false; $("st-photo").value = ""; $("st-thumb").hidden = true;
-    $("st-type").value = d.type || "Family story"; $("st-srcwrap").hidden = !/^Documented/.test($("st-type").value);
-    $("st-send").disabled = false; say("");
-    modal.hidden = false; $("st-text").focus();
-  }
-  function closeForm() { saveDraft(); modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
-  function fields() { return { text: $("st-text").value.trim(), type: $("st-type").value, source: $("st-src").value.trim(), name: $("st-name").value.trim(), connection: $("st-conn").value.trim(), teller: $("st-teller").value.trim(), link: $("st-link").value.trim(), contact: $("st-contact").value.trim() }; }
-  function saveDraft() { try { const f = fields(); if (f.text) localStorage.setItem(draftKey(), JSON.stringify(f)); } catch (e) {} }
-  ["st-text", "st-name", "st-conn", "st-teller", "st-contact", "st-src", "st-link"].forEach(id => $(id).addEventListener("input", saveDraft));
-
-  $("st-send").addEventListener("click", async function () {
-    const f = fields();
-    if (!f.text) { say("Please write the story or memory first.", true); $("st-text").focus(); return; }
-    if (f.link && window.StoryMedia) { const c = StoryMedia.check(f.link); if (c.bad.length || !c.ok.length) { say("That link doesn't look right. It should start with https://, like a YouTube address.", true); $("st-link").focus(); return; } }
-    if (!$("st-consent").checked) { say("Please tick the permission box.", true); $("st-consent").focus(); return; }
-    if (!navigator.onLine) { saveDraft(); say("You're offline. Your story is saved on this device. Open this form again when you have signal and press Send.", true); return; }
-    const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
-    const media = [], data = Object.assign({}, f, { consent: true, cemetery: target.cemetery || (target.type === "cemetery" ? target.id : ""), person: target.person || "", label: target.label || "", page: location.href.split("?")[0] });
-    if (photoData) { const m = /^data:([^;]+);base64,(.*)$/.exec(photoData); if (m) { media.push({ mime: m[1], data: m[2] }); data.photo = "media:0"; } }
-    if (audioData) { media.push(audioData); data.audio = "media:" + (media.length - 1); }
-    $("st-send").disabled = true; say("Sending…");
-    try {
-      const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: target.type, id: target.id }, data, media, created: new Date().toISOString(), submitter: f.name }) });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.ok) { try { localStorage.removeItem(draftKey()); } catch (e) {} say("Thank you! A volunteer will review your story before it appears."); setTimeout(function () { modal.hidden = true; }, 2600); }
-      else { $("st-send").disabled = false; say(j.error || "The story couldn't be sent. Please try again.", true); }
-    } catch (e) { $("st-send").disabled = false; saveDraft(); say("No connection to the inbox. Your story is saved on this device; try again in a moment.", true); }
-  });
-
-  /* ---------- Suggest a correction: anyone can point out a mistake; a lead checks it and fixes the record ---------- */
-  const fix = document.createElement("div");
-  fix.id = "cr-modal"; fix.className = "stm"; fix.hidden = true; fix.setAttribute("role", "dialog"); fix.setAttribute("aria-modal", "true");
-  fix.innerHTML = '<div class="box"><h2>Suggest a correction</h2><p class="sub" id="cr-for"></p>' +
-    '<label for="cr-what">What is wrong?</label><textarea id="cr-what" maxlength="1000" placeholder="For example: the death year says 1856"></textarea>' +
-    '<label for="cr-should">What should it say?</label><textarea id="cr-should" maxlength="1000" placeholder="For example: 1858"></textarea>' +
-    '<label for="cr-how">How do you know? *</label><textarea id="cr-how" maxlength="1500" placeholder="For example: I read the stone in 2025, or it is in the family Bible, or the death certificate says so"></textarea>' +
-    '<label for="cr-name">Your name *</label><input type="text" id="cr-name" maxlength="100">' +
-    '<label for="cr-contact">Email or phone (optional, only the reviewer sees it)</label><input type="text" id="cr-contact" maxlength="150">' +
-    '<div class="msg" id="cr-msg" role="status"></div><div class="row"><button type="button" id="cr-cancel">Cancel</button><button type="button" class="go" id="cr-send">Send</button></div></div>';
-  document.body.appendChild(fix);
-  const cf = id => document.getElementById(id);
-  let fixTarget = null;
-  function openFix(t) {
-    fixTarget = t; ["cr-what", "cr-should", "cr-how", "cr-msg"].forEach(id => { const e = cf(id); if (e.tagName === "DIV") e.textContent = ""; else e.value = ""; });
-    cf("cr-for").textContent = "About: " + (t.label || t.id) + ". A volunteer checks every correction before anything changes.";
-    try { cf("cr-name").value = localStorage.getItem("story:name") || cf("cr-name").value; } catch (e) {}
-    fix.hidden = false; cf("cr-send").disabled = false; cf("cr-what").focus();
-  }
-  cf("cr-cancel").onclick = () => { fix.hidden = true; };
-  cf("cr-send").onclick = async () => {
-    const what = cf("cr-what").value.trim(), should = cf("cr-should").value.trim(), how = cf("cr-how").value.trim(), name = cf("cr-name").value.trim(), m = cf("cr-msg");
-    const err = t => { m.textContent = t; m.className = "msg err"; };
-    if (!what && !should) return err("Say what is wrong, or what it should say.");
-    if (!how) { cf("cr-how").focus(); return err("Please say how you know. It helps the reviewer check it."); }
-    if (!name) { cf("cr-name").focus(); return err("Please add your name."); }
-    const t = fixTarget, id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
-    const data = { type: "correction", what, should, how, name, contact: cf("cr-contact").value.trim(), consent: true,
-      text: "Correction: " + (what || "") + (should ? " \u2192 " + should : "") + ". How they know: " + how,
-      cemetery: t.cemetery || (t.type === "cemetery" ? t.id : ""), person: t.person || "", label: t.label || "", page: location.href.split("?")[0] };
-    cf("cr-send").disabled = true; m.textContent = "Sending\u2026"; m.className = "msg";
-    try {
-      const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: t.type, id: t.id }, data, media: [], created: new Date().toISOString(), submitter: name }) });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.ok) { m.textContent = "Thank you! A volunteer will check it."; m.className = "msg ok"; setTimeout(() => { fix.hidden = true; }, 2200); }
-      else { cf("cr-send").disabled = false; err(j.error || "It couldn't be sent. Please try again."); }
-    } catch (e) { cf("cr-send").disabled = false; err("No connection right now. Please try again in a moment."); }
+function contactLine() {
+  const c = S.contact || {};
+  const bits = [c.name, c.email ? '<a href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a>" : "", c.phone].filter(Boolean);
+  return bits.length ? bits.map(b => b.startsWith("<a") ? b : esc(b)).join(" · ") : "the county's survey lead";
+}
+function showNoInvite() {
+  $("homeBtn").classList.add("hidden"); bar([]);
+  $("main").innerHTML = '<div class="card"><h2>Would you like to help survey?</h2><p>Surveys are done by invited volunteers so every record can be checked. To get an invite, contact ' + contactLine() + ".</p>" +
+    '<p class="muted">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears. Or type the code from your invite link:</p>' +
+    '<input type="text" id="codeIn" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD" aria-label="Invite code"><button type="button" class="primary big" id="codeGo">Sign in</button><p id="codeMsg" class="err" role="status"></p>' +
+    '<p><a href="index.html">Back to the map</a></p></div>';
+  $("codeGo").onclick = async () => {
+    const code = $("codeIn").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = $("codeMsg");
+    if (!code) { m.textContent = "Type your invite code."; return; }
+    m.textContent = "Checking…";
+    try { const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": code } }), j = await r.json();
+      if (!j.ok) { m.textContent = j.error || "That code didn't work."; return; }
+      invite = { code, name: j.name }; store.set("invite:" + AREA, JSON.stringify(invite)); await pruneSent(); showHome(); sendPending(true);
+    } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection and try again."; }
   };
-})();
+}
+
+/* ---------------- home ---------------- */
+async function showHome() {
+  current = null; stopMapModes(); $("homeBtn").classList.add("hidden");
+  const all = (await DB.all()).filter(mine).sort((a, b) => b.updated.localeCompare(a.updated));
+  if (current) return;   // a cemetery visit opened while this was loading: leave it alone
+  const pend = all.filter(e => e.status === "pending"), drafts = all.filter(e => e.status === "draft");
+  const m = $("main"); m.innerHTML = "";
+  if (invite && invite.revoked) { const w = el("div", { class: "card", style: "border-color:#e5b4b4" }); w.innerHTML = "<h3>Your invite is no longer active</h3><p>Surveys saved on this phone are kept. Contact " + contactLine() + " for a new invite.</p>"; m.append(w); }
+  m.append(el("div", { class: "card" }, [
+    el("p", { id: "greet", class: "muted", text: invite && invite.name ? "Signed in as " + invite.name : "Invite saved on this phone" }),
+    el("button", { type: "button", class: "primary big", text: "Start a cemetery visit", onclick: pickCemetery }),
+    el("p", { class: "muted", style: "margin-top:8px", text: "Everything saves on this phone first. It sends itself when you have signal." })
+  ]));
+  const card = el("div", { class: "card" }, [el("h3", { text: "Your surveys" })]);
+  if (!all.length) card.append(el("p", { class: "muted", text: "Nothing saved yet." }));
+  const list = el("div", { class: "list" });
+  all.slice(0, 60).forEach(e => list.append(entryRow(e)));
+  card.append(list); m.append(card);
+  const unsent = pend.length + drafts.length;
+  bar(unsent ? [
+    el("button", { type: "button", class: "primary", text: pend.length ? "Send now (" + pend.length + ")" : "Nothing to send", disabled: !pend.length || !navigator.onLine || (invite && invite.revoked), onclick: () => sendPending(false) }),
+    el("button", { type: "button", text: "Save to a file", onclick: exportUnsent })
+  ] : []);
+}
+function entryTitle(e) {
+  const c = CEMS.find(x => x.id === e.cemetery), cn = c ? c.name : e.cemetery;
+  if (e.kind === "cemetery") return "Cemetery details · " + cn;
+  const a = e.answers || {}, p = (a.people || [])[0], who = p && (p.first || p.last) ? [p.first, p.last].filter(Boolean).join(" ") : "";
+  return (a.feature_type || "Marker") + (who ? " · " + who : "") + " · " + cn;
+}
+function entryRow(e) {
+  const when = new Date(e.updated).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const pill = { draft: "Not finished", pending: "Waiting to send", sent: "Sent" }[e.status] || e.status;
+  return el("div", { class: "item" }, [
+    el("div", { class: "grow" }, [el("b", { text: entryTitle(e) }), el("small", { text: when + (e.error ? " · " + e.error : "") })]),
+    el("span", { class: "pill " + e.status, text: pill }),
+    e.status !== "sent" ? el("button", { type: "button", class: "small", text: "Open", onclick: () => openEntry(e) }) : null
+  ]);
+}
+function bar(buttons) { const b = $("barIn"); b.innerHTML = ""; buttons.forEach(x => b.append(x)); $("bar").classList.toggle("on", buttons.length > 0); }
+
+/* a small panel from the bottom of the screen: title, text, buttons. Returns a close function. */
+function sheet(title, text, buttons) {
+  document.querySelectorAll(".sheet").forEach(x => x.remove());
+  const sh = el("div", { class: "sheet", role: "dialog" }, [el("h3", { text: title }), text ? el("p", { class: "muted", text }) : null, el("div", { class: "row" }, buttons)]);
+  document.body.append(sh); return () => sh.remove();
+}
+const closeSheets = () => document.querySelectorAll(".sheet").forEach(x => x.remove());
+
+/* ---------------- choosing a cemetery ---------------- */
+let here = null;
+function pickCemetery() {
+  $("homeBtn").classList.remove("hidden"); bar([]);
+  const m = $("main"); m.innerHTML = "";
+  const search = el("input", { type: "search", placeholder: "Search by name", "aria-label": "Search cemeteries" });
+  const list = el("div", { class: "list" });
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    let rows = CEMS.filter(c => !q || (c.name + " " + c.other + " " + c.id).toLowerCase().includes(q));
+    if (here) rows = rows.map(c => Object.assign({}, c, { d: isFinite(c.ll[0]) ? dist(here, c.ll) : 1e9 })).sort((a, b) => a.d - b.d);
+    list.innerHTML = "";
+    rows.slice(0, 80).forEach(c => list.append(el("button", { type: "button", class: "item", onclick: () => startVisit(c) }, [
+      el("div", { class: "grow" }, [el("b", { text: c.name }), el("small", { text: [c.id, c.township, c.other].filter(Boolean).join(" · ") + (c.d != null && c.d < 1e8 ? " · " + miles(c.d) : "") })])
+    ])));
+    if (!rows.length) list.append(el("p", { class: "muted", text: "No match." }));
+  };
+  search.oninput = draw;
+  m.append(el("div", { class: "card" }, [el("h2", { text: "Which cemetery?" }), search,
+    el("button", { type: "button", class: "small", style: "margin:8px 0", text: "Sort by nearest", onclick: async () => { try { const p = await locate(); here = p.ll; draw(); } catch (e) { toast(e.message); } } }), list]));
+  draw();
+}
+const dist = (a, b) => { const k = Math.cos(a[1] * Math.PI / 180); return Math.hypot((a[0] - b[0]) * k, a[1] - b[1]) * 111320; };
+const miles = m => m < 160 ? Math.round(m * 3.28084) + " ft" : (m / 1609.344).toFixed(1) + " mi";
+
+/* ---------------- a visit: the map plus the two kinds of entry ---------------- */
+async function startVisit(c) {
+  current = c; $("homeBtn").classList.remove("hidden"); closeSheets();
+  if (map && map.getLayer("ents")) map.setFilter("ents", null);
+  const m = $("main"); m.innerHTML = "";
+  const slot = el("div", { class: "mapSlot" }); m.append(slot);
+  await mountMap(slot); focusCemetery(c);
+  const saved = (await DB.all()).filter(e => e.area === AREA && e.cemetery === c.id);
+  const hasCem = saved.find(e => e.kind === "cemetery" && e.status !== "sent");
+  const choice = (title, sub, cls, fn) => el("button", { type: "button", class: "choice big" + (cls ? " " + cls : ""), onclick: fn }, [el("b", { text: title }), el("small", { text: sub })]);
+  m.append(el("div", { class: "card" }, [
+    el("h2", { text: c.name }),
+    choice(hasCem ? "Continue Editing the Cemetery" : "Edit the Cemetery", "Condition, fence, hazards, the boundary and the entrances", "", () => hasCem ? openEntry(hasCem) : newEntry("cemetery", { type: "cemetery", id: c.id })),
+    choice("Edit a Grave", "Tap a grave on the map to fix its details or move it", "primary", () => pickExisting()),
+    choice("Add a New Grave", "Something that isn't on the map yet", "", () => sheet("Add a new grave", "Where is it?", [
+      el("button", { type: "button", text: "Use my location", onclick: async () => { closeSheets(); try { const p = await locate(); newEntry("marker", { type: "new", id: "" }, p); } catch (er) { toast(er.message); } } }),
+      el("button", { type: "button", text: "Tap the map", onclick: () => { closeSheets(); tapMap("Tap where it is on the map.", ll => newEntry("marker", { type: "new", id: "" }, { ll, acc: null, how: "map" })); } }),
+      el("button", { type: "button", text: "Cancel", onclick: closeSheets })])),
+    el("p", { class: "muted", style: "margin-top:8px", text: (saved.length ? saved.length + " saved here on this phone. " : "") + "Tip: you can also tap a gray dot or an entrance on the map directly. Green dots are ones you've added." }),
+    el("button", { type: "button", class: "big", style: "margin-top:6px", text: "Cancel: back to the start", onclick: () => showHome() })
+]));
+  bar([el("button", { type: "button", text: "Done with this cemetery", onclick: showHome })]);
+}
+
+/* existing stones in this cemetery, one per MARKER_ID */
+function stonesIn(cid) {
+  const by = new Map();
+  STONES.filter(r => String(r.CEMETERY_ID || "").trim() === cid).forEach(r => {
+    const id = String(r.MARKER_ID || r.PERSON_ID || "").trim(), lat = parseFloat(r.LAT), lng = parseFloat(r.LONG);
+    if (!id || !isFinite(lat) || !isFinite(lng)) return;
+    const name = [r["FIRST NAME"], r["LAST NAME"]].filter(Boolean).join(" ");
+    if (!by.has(id)) by.set(id, { id, ll: [lng, lat], names: [] });
+    if (name) by.get(id).names.push(name);
+  });
+  return [...by.values()];
+}
+async function sessionMarkers(cid) {   // markers added on this phone (not yet in the CSV)
+  return (await DB.all()).filter(e => e.area === AREA && e.cemetery === cid && e.kind === "marker" && e.where && e.target.type === "new")
+    .map(e => ({ id: "new:" + e.id.slice(0, 8), ll: e.where.ll, names: [entryTitle(e).split(" · ")[0]], entry: e.id }));
+}
+function pickExisting() {
+  const list = stonesIn(current.id);
+  if (!list.length) return toast("No markers are on the map for this cemetery yet. Use New instead.");
+  tapMap("Tap the marker you're recording.", ll => {
+    let best = null; list.forEach(s => { const d = dist(ll, s.ll); if (!best || d < best.d) best = { s, d }; });
+    if (!best || best.d > 25) { toast("No marker there. Zoom in and tap right on a gray dot."); return pickExisting(); }
+    confirmGrave(best.s);
+  });
+}
+// "Edit this grave?" with the names and years on record, so the right one is picked
+function graveRows(id) { return STONES.filter(r => String(r.MARKER_ID || r.PERSON_ID || "").trim() === id); }
+const yearOf = v => { const m = String(v || "").match(/\b(1[5-9]\d\d|20\d\d)\b/); return m ? m[1] : ""; };
+async function confirmGrave(st) {
+  const rows = graveRows(st.id);
+  const who = rows.map(r => { const n = [r["FIRST NAME"], r["LAST NAME"]].filter(Boolean).join(" ") || "Name unknown", y = [yearOf(r.BIRTH), yearOf(r.DEATH)]; return n + (y[0] || y[1] ? " (" + (y[0] || "?") + "\u2013" + (y[1] || "?") + ")" : ""); });
+  const draft = (await DB.all()).find(x => mine(x) && x.kind === "marker" && x.target && x.target.id === st.id && x.status === "draft");
+  sheet("Edit this grave?", (who.length ? who.join(", ") : "No names on record") + (draft ? ". You have unsaved changes to it on this phone." : ""), [
+    el("button", { type: "button", text: "No, pick another", onclick: () => { closeSheets(); pickExisting(); } }),
+    el("button", { type: "button", class: "primary", text: draft ? "Yes, continue" : "Yes, edit it", onclick: () => { closeSheets(); draft ? openEntry(draft) : newEntry("marker", { type: "marker", id: st.id }, { ll: st.ll, acc: null, how: "existing" }, st); } })
+  ]);
+}
+
+/* ---------------- the map ---------------- */
+let map = null, mapReady = null, aerial = true, tapCb = null;
+function mountMap(slot) {
+  slot.append(NODES.map, NODES.banner, NODES.base);
+  if (!map) {
+    map = new maplibregl.Map({ container: NODES.map, attributionControl: { compact: true }, center: S.center || [-85.0, 39.6], zoom: S.zoom || 11,
+      style: { version: 8, sources: {
+        osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19, attribution: "&copy; OpenStreetMap contributors" },
+        usgs: { type: "raster", tiles: ["https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 16, attribution: "USGS The National Map" },
+        indiana: { type: "raster", tiles: ["https://di-ingov.img.arcgis.com/arcgis/rest/services/DynamicWebMercator/Indiana_Current_Imagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpgpng&f=image"], tileSize: 256, maxzoom: 20, attribution: "Indiana Geographic Information Office" }
+      }, layers: [{ id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } }, { id: "usgs", type: "raster", source: "usgs" }, { id: "indiana", type: "raster", source: "indiana" }] } });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), "top-right");
+    mapReady = new Promise(ok => map.on("load", () => {
+      const empty = { type: "FeatureCollection", features: [] };
+      map.addSource("bounds", { type: "geojson", data: BOUNDS });
+      map.addLayer({ id: "bounds-fill", type: "fill", source: "bounds", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.08 } });
+      map.addLayer({ id: "bounds-line", type: "line", source: "bounds", paint: { "line-color": (S.colors && S.colors.boundary) || "#01796F", "line-width": 2.5 } });
+      map.addSource("ents", { type: "geojson", data: entranceData() });
+      map.addLayer({ id: "ents", type: "circle", source: "ents", paint: { "circle-radius": 9, "circle-color": "#ffffff", "circle-stroke-color": (S.colors && S.colors.boundary) || "#01796F", "circle-stroke-width": 4 } });
+      map.addSource("stones", { type: "geojson", data: empty });
+      map.addLayer({ id: "stones", type: "circle", source: "stones", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 3, 20, 9], "circle-color": ["case", ["get", "mine"], "#22c55e", "#e5e1d8"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 1.5 } });
+      map.addSource("draft", { type: "geojson", data: empty });
+      map.addLayer({ id: "draft-fill", type: "fill", source: "draft", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#facc15", "fill-opacity": 0.2 } });
+      map.addLayer({ id: "draft-line", type: "line", source: "draft", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": "#facc15", "line-width": 3 } });
+      map.addLayer({ id: "draft-pts", type: "circle", source: "draft", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": ["coalesce", ["get", "color"], "#facc15"], "circle-stroke-color": "#1f1b16", "circle-stroke-width": 2 } });
+      ok();
+    }));
+    map.on("click", e => { if (tapCb) { const cb = tapCb; clearTap(); cb([r6(e.lngLat.lng), r6(e.lngLat.lat)]); } else directTap(e); });
+    NODES.cancel.onclick = stopMapModes;
+    NODES.base.onclick = () => { aerial = !aerial; ["usgs", "indiana"].forEach(l => map.setLayoutProperty(l, "visibility", aerial ? "visible" : "none")); map.setLayoutProperty("osm", "visibility", aerial ? "none" : "visible"); NODES.base.textContent = aerial ? "Street map" : "Aerial"; };
+  }
+  setTimeout(() => map.resize(), 30);
+  return mapReady;
+}
+// Entrances of every cemetery, from the boundaries file, as map points
+function entranceData() {
+  const feats = [];
+  BOUNDS.features.forEach(f => { const p = f.properties || {}; (p.ENTRANCES || []).forEach(en => { if (en && Array.isArray(en.coords)) feats.push({ type: "Feature", properties: { cid: String(p.CEMETERY_ID || ""), size: en.size || "primary" }, geometry: { type: "Point", coordinates: en.coords } }); }); });
+  return { type: "FeatureCollection", features: feats };
+}
+// On the cemetery screen, tapping a gray dot opens that grave, and tapping an entrance opens Cemetery details.
+async function directTap(e) {
+  if (!current || $("formBox")) return;
+  const p = e.point, hits = map.queryRenderedFeatures([[p.x - 14, p.y - 14], [p.x + 14, p.y + 14]], { layers: ["stones", "ents"] });
+  const stone = hits.find(h => h.layer.id === "stones" && h.properties.id), ent = hits.find(h => h.layer.id === "ents" && h.properties.cid === current.id);
+  if (stone) {
+    const st = stonesIn(current.id).find(x => x.id === stone.properties.id);
+    if (st) return confirmGrave(st);
+  }
+  if (ent) {
+    const saved = (await DB.all()).find(x => x.area === AREA && x.cemetery === current.id && x.kind === "cemetery" && x.status !== "sent");
+    if (saved) await openEntry(saved); else await newEntry("cemetery", { type: "cemetery", id: current.id });
+    toast("Tap an entrance on the map to move, remove or change it. Drag to move. Then Save.", 6000);
+  }
+}
+async function focusCemetery(c) {
+  await mapReady; await refreshStones();
+  const b = BOUNDS.features.find(f => f.properties && String(f.properties.CEMETERY_ID) === c.id && f.geometry && f.geometry.type === "Polygon");
+  if (b) { const bb = new maplibregl.LngLatBounds(); b.geometry.coordinates[0].forEach(p => bb.extend(p)); map.fitBounds(bb, { padding: 30, maxZoom: 19, animate: false }); }
+  else if (isFinite(c.ll[0])) map.jumpTo({ center: c.ll, zoom: 17.5 });
+}
+async function refreshStones() {
+  if (!map || !current) return; await mapReady;
+  const feats = stonesIn(current.id).map(s => ({ type: "Feature", properties: { mine: false, id: s.id }, geometry: { type: "Point", coordinates: s.ll } }))
+    .concat((await sessionMarkers(current.id)).map(s => ({ type: "Feature", properties: { mine: true }, geometry: { type: "Point", coordinates: s.ll } })));
+  map.getSource("stones").setData({ type: "FeatureCollection", features: feats });
+}
+function setDraft(feats) { if (map && map.getSource("draft")) map.getSource("draft").setData({ type: "FeatureCollection", features: feats || [] }); }
+let cancelHook = null;   // lets "Draw on the map" know the surveyor pressed Cancel
+function tapMap(text, cb) { tapCb = cb; NODES.bannerText.textContent = text; NODES.banner.classList.add("on"); map.getCanvas().style.cursor = "crosshair"; const s = NODES.map.parentElement; if (s && s.getBoundingClientRect().top < 0) s.scrollIntoView({ behavior: "smooth", block: "start" }); }
+function clearTap() { tapCb = null; NODES.banner.classList.remove("on"); if (map) map.getCanvas().style.cursor = ""; }
+function stopMapModes() { const h = cancelHook; cancelHook = null; clearTap(); NODES.cancel.textContent = "Cancel"; if (h) h(); }
+
+/* draggable handles on the map (boundary corners, the marker's own pin). Cleared whenever a form is redrawn. */
+let handles = [];
+function clearHandles() { handles.forEach(m => m.remove()); handles = []; }
+function handle(ll, cls, opts) {
+  const d = document.createElement("div"); d.className = cls;
+  if (opts.label) d.setAttribute("aria-label", opts.label);
+  const mk = new maplibregl.Marker({ element: d, draggable: !!opts.drag }).setLngLat(ll).addTo(map);
+  if (opts.drag) mk.on("dragend", () => { const p = mk.getLngLat(); opts.drag([r6(p.lng), r6(p.lat)]); });
+  if (opts.click) d.addEventListener("click", ev => { ev.stopPropagation(); opts.click(); });
+  handles.push(mk); return mk;
+}
+
+/* GPS: one careful reading. Waits up to 20 s for a good fix and keeps the best one. */
+function locate() {
+  return new Promise((ok, bad) => {
+    if (!navigator.geolocation) return bad(new Error("This phone can't share its location with the page."));
+    toast("Getting your location… hold still.", 20000);
+    let best = null, done = false;
+    const finish = () => { if (done) return; done = true; navigator.geolocation.clearWatch(w); clearTimeout(t); $("toast").classList.remove("on"); best ? ok(best) : bad(new Error("Couldn't get a location. Check that location is on for this browser, or tap the map instead.")); };
+    const w = navigator.geolocation.watchPosition(p => {
+      const g = { ll: [r6(p.coords.longitude), r6(p.coords.latitude)], acc: Math.round(p.coords.accuracy), how: "gps", at: new Date().toISOString() };
+      if (!best || g.acc < best.acc) best = g;
+      if (best.acc <= 5) finish();
+    }, e => { if (!best) { done = true; navigator.geolocation.clearWatch(w); clearTimeout(t); $("toast").classList.remove("on"); bad(new Error(e.code === 1 ? "Location permission was refused. Allow location for this site in the browser settings." : "Couldn't get a location. Try again, or tap the map.")); } }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    const t = setTimeout(finish, 20000);
+  });
+}
+const accText = g => g ? (g.how === "gps" ? "GPS, about " + Math.round(g.acc * 3.28084) + " ft accuracy" + (g.acc > 15 ? " (weak: try again in the open, or tap the map)" : "") : g.how === "existing" ? "Where the map has it" : g.how === "moved" ? "Moved on the map" : "Placed on the map") : "";
+
+/* ---------------- entries ---------------- */
+async function newEntry(kind, target, where, stone) {
+  const e = { id: uid(), area: AREA, kind, cemetery: current.id, target, where: where || null, answers: {}, status: "draft", created: new Date().toISOString(), updated: new Date().toISOString(), stoneNames: stone ? stone.names : [] };
+  if (kind === "marker" && stone && stone.names.length) e.answers.readable = "Yes";
+  if (kind === "marker" && target.type === "marker") {          // an existing grave: start from what's on record
+    const rows = graveRows(target.id), a = e.answers;
+    a.people = rows.map(r => ({ first: r["FIRST NAME"] || "", last: r["LAST NAME"] || "", birth: r.BIRTH || "", death: r.DEATH || "", sex: r.SEX || "", _pid: r.PERSON_ID || "" }));
+    if (rows.some(r => r.VETERAN === "1")) a.veteran = "Yes";
+    if (rows.some(r => r.MAUS === "1")) a.feature_type = "Above-ground structure / mausoleum";
+    const row = rows.map(r => r.ROW || r.PLOT).find(Boolean); if (row) a.row_plot = row;
+    const ins = rows.map(r => r["ADDITIONAL INFORMATION ON STONE"]).find(Boolean); if (ins) a.inscription = ins;
+    a._orig = JSON.parse(JSON.stringify({ people: a.people, veteran: a.veteran || "", feature_type: a.feature_type || "", row_plot: a.row_plot || "", inscription: a.inscription || "" }));
+  }
+  if (kind === "cemetery") {                                    // its entrances as they are now, to move, add or remove
+    const f = BOUNDS.features.find(x => x.properties && String(x.properties.CEMETERY_ID) === current.id && Array.isArray(x.properties.ENTRANCES));
+    const list = f ? f.properties.ENTRANCES.filter(en => en && Array.isArray(en.coords)).map((en, i) => ({ label: en.label || "Entrance", size: en.size || "primary", coords: en.coords.slice(), _i: i })) : [];
+    e.answers.entrances = list; e.answers._entrances_orig = JSON.parse(JSON.stringify(list));
+  }
+  e.initial = JSON.stringify(e.answers);
+  await DB.put(e); openEntry(e);
+}
+async function openEntry(e) {
+  if (!current || current.id !== e.cemetery) current = CEMS.find(c => c.id === e.cemetery) || { id: e.cemetery, name: e.cemetery, ll: [NaN, NaN] };
+  $("homeBtn").classList.remove("hidden");
+  const m = $("main"); m.innerHTML = "";
+  const slot = el("div", { class: "mapSlot" }); m.append(slot);
+  await mountMap(slot);
+  if (e.where) { await mapReady; map.jumpTo({ center: e.where.ll, zoom: Math.max(map.getZoom(), 19) }); } else focusCemetery(current);
+  await refreshStones();
+  renderForm(e);
+}
+
+function visible(q, a) {
+  const s = q.showIf; if (!s) return true;
+  const v = a[s.q];
+  if (s.is != null) return Array.isArray(v) ? v.includes(s.is) : v === s.is;
+  if (s.in) return Array.isArray(v) ? v.some(x => s.in.includes(x)) : s.in.includes(v);
+  return true;
+}
+const optionsOf = q => q.options || (q.optionsFrom && Q[q.optionsFrom]) || [];
+
+function renderForm(e) {
+  clearHandles();
+  const m = $("main"), qs = Q.questions.filter(q => (q.for === e.kind || q.for === "both") && !(e.answers.entrances && (q.id === "entrance_safe" || q.id === "entrance_point")))
+    .map(q => q.id === "entrance_photo" && e.answers.entrances ? Object.assign({}, q, { showIf: null }) : q);
+  let box = $("formBox"); if (box) box.remove();
+  box = el("div", { id: "formBox" });
+  const head = el("div", { class: "card" }, [
+    el("h2", { text: e.kind === "cemetery" ? "Cemetery details" : (e.target.type === "marker" ? "Existing marker" : "New marker or find") }),
+    el("p", { class: "muted", text: current.name + (e.stoneNames && e.stoneNames.length ? " · on record: " + e.stoneNames.join(", ") : "") }),
+    e.where ? el("p", { class: "coord", text: accText(e.where) }) : null,
+    e.kind === "marker" && e.where ? el("div", { class: "row" }, [
+      el("button", { type: "button", class: "small", text: e.target.type === "new" ? "Move this point" : "Move this marker", onclick: () => tapMap("Tap where it really is. You can also drag the pin.", ll => movePoint(e, ll)) }),
+      e.moved ? el("button", { type: "button", class: "small", text: "Put it back", onclick: () => movePoint(e, e.moved.from, true) }) : null
+    ]) : null,
+    e.moved ? el("p", { class: "coord", style: "color:#9a3412", text: "Moved " + miles(dist(e.moved.from, e.where.ll)) + " from where the map had it. The reviewer will see both spots." }) : null
+  ]);
+  box.append(head);
+  const core = el("div", { class: "card" }), more = el("details", { class: "more" }, [el("summary", { text: "Add more detail (optional)" })]);
+  if (store.get("expandMore") === "1") more.open = true;
+  more.addEventListener("toggle", () => store.set("expandMore", more.open ? "1" : "0"));
+  const moreBody = el("div");
+  qs.forEach(q => { if (!visible(q, e.answers)) return; (q.level === "expanded" ? moreBody : core).append(question(q, e)); });
+  if (moreBody.childNodes.length) { more.append(moreBody); core.append(more); }
+  box.append(core);
+  if (e.kind === "cemetery" && e.answers.entrances) box.append(entranceCard(e));
+  m.append(box);
+  if (e.kind === "cemetery") { drawCemDraft(e); drawEntrances(e); }
+  else {
+    setDraft(e.moved ? [{ type: "Feature", properties: { color: "#9ca3af" }, geometry: { type: "Point", coordinates: e.moved.from } }] : []);
+    if (e.where) handle(e.where.ll, "pin" + (e.moved ? " moved" : ""), { label: "This marker. Drag to move it.", drag: ll => movePoint(e, ll) });
+  }
+  bar([
+    el("button", { type: "button", text: "Cancel", onclick: () => cancelEntry(e) }),
+    el("button", { type: "button", class: "primary", text: "Save", onclick: () => finish(e) })
+  ]);
+}
+/* moving a marker: a new one just moves; an existing one remembers where the map had it, so the reviewer can compare */
+async function movePoint(e, ll, back) {
+  if (e.target.type === "marker") {
+    if (!e.moved) e.moved = { from: e.where.ll.slice() };
+    if (back || dist(e.moved.from, ll) < 0.3) { e.where = { ll: e.moved.from, acc: null, how: "existing" }; delete e.moved; }
+    else e.where = { ll, acc: null, how: "moved" };
+  } else e.where = { ll, acc: null, how: "map" };
+  await save(e); const y = window.scrollY; renderForm(e); window.scrollTo(0, y); refreshStones();
+}
+async function save(e) { e.updated = new Date().toISOString(); await DB.put(e); }
+// Cancel: leave without sending. Nothing changed: it just goes. Changes: ask before throwing them away.
+async function cancelEntry(e) {
+  stopMapModes(); closeSheets();
+  const same = e.initial != null && e.initial === JSON.stringify(e.answers) && !e.moved;
+  if (!same && !confirm("Throw away the changes in this survey?")) return;
+  await DB.del(e.id); current ? startVisit(current) : showHome();
+}
+
+/* ---------- entrances: tap one to move, delete or change it; tap the map to add one ---------- */
+const sameLL = (a, b) => a && b && Math.abs(a[0] - b[0]) < 1e-7 && Math.abs(a[1] - b[1]) < 1e-7;
+function entState(e, en) {
+  const o = en._i != null ? (e.answers._entrances_orig || [])[en._i] : null;
+  if (!o) return "new";
+  return sameLL(o.coords, en.coords) && o.size === en.size ? "" : "changed";
+}
+function entranceCard(e) {
+  const a = e.answers, card = el("div", { class: "card" }, [el("h3", { text: "Entrances" }),
+    el("p", { class: "muted", text: "Tap an entrance on the map, or here, to move it, remove it or make it the main one. Drag it to move it. There can be more than one main entrance." })]);
+  a.entrances.forEach((en, i) => {
+    const st = entState(e, en);
+    card.append(el("div", { class: "entrow" }, [el("span", { text: (en.size === "primary" ? "Main entrance" : "Other entrance") + (st === "new" ? " (new)" : st === "changed" ? " (changed)" : "") }),
+      el("button", { type: "button", class: "small", text: "Change", onclick: () => entranceMenu(e, i) })]));
+  });
+  const gone = (a._entrances_orig || []).filter((o, i) => !a.entrances.some(en => en._i === i));
+  gone.forEach(o => card.append(el("div", { class: "entrow gone" }, [el("span", { text: (o.size === "primary" ? "Main entrance" : "Other entrance") + " (removed)" }),
+    el("button", { type: "button", class: "small", text: "Undo", onclick: () => { a.entrances.push(JSON.parse(JSON.stringify(o)), ); a.entrances[a.entrances.length - 1]._i = a._entrances_orig.indexOf(o); changed(e, true); } })])));
+  card.append(el("div", { class: "row" }, [el("button", { type: "button", text: "Add an entrance", onclick: () => tapMap("Tap where the entrance is.", ll => { a.entrances.push({ label: "Entrance", size: a.entrances.some(x => x.size === "primary") ? "secondary" : "primary", coords: ll }); changed(e, true); }) })]));
+  return card;
+}
+function entranceMenu(e, i) {
+  const a = e.answers, en = a.entrances[i];
+  sheet(en.size === "primary" ? "Main entrance" : "Other entrance", "Drag it on the map to move it, or:", [
+    el("button", { type: "button", text: "Move", onclick: () => { closeSheets(); tapMap("Tap where this entrance really is.", ll => { en.coords = ll; changed(e, true); }); } }),
+    el("button", { type: "button", text: en.size === "primary" ? "Make Other" : "Make Main", onclick: () => { closeSheets(); en.size = en.size === "primary" ? "secondary" : "primary"; changed(e, true); } }),
+    el("button", { type: "button", class: "danger", text: "Remove", onclick: () => { closeSheets(); a.entrances.splice(i, 1); changed(e, true); } }),
+    el("button", { type: "button", text: "Cancel", onclick: closeSheets })
+  ]);
+}
+function drawEntrances(e) {
+  const a = e.answers;
+  if (map.getLayer("ents")) map.setFilter("ents", ["!=", ["get", "cid"], current.id]);   // the form's own entrance pins replace them
+  a.entrances.forEach((en, i) => {
+    const st = entState(e, en);
+    handle(en.coords, "ent" + (en.size === "primary" ? "" : " sec") + (st ? " " + st : ""), { label: "Entrance. Tap for choices, drag to move.", drag: ll => { en.coords = ll; changed(e, true); }, click: () => entranceMenu(e, i) });
+  });
+}
+let saveTimer = 0;
+function changed(e, rerender) { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(e), 300); if (rerender) { save(e).then(() => { const y = window.scrollY; renderForm(e); window.scrollTo(0, y); }); } }
+
+async function finish(e) {
+  const missing = Q.questions.filter(q => (q.for === e.kind) && q.required && visible(q, e.answers) && (e.answers[q.id] == null || e.answers[q.id] === "" || (Array.isArray(e.answers[q.id]) && !e.answers[q.id].length)));
+  if (missing.length) { toast("Please answer: " + missing.map(q => q.label).join(", ")); return; }
+  if (e.kind === "marker" && !e.where) { toast("Place it on the map first."); return; }
+  const b = e.answers.boundary; if (b && b.length && b.length < 3) { toast("A boundary needs at least 3 corners, or clear it."); return; }
+  e.status = "pending"; e.error = ""; await save(e);
+  toast(navigator.onLine ? "Saved. Sending…" : "Saved on this phone. It will send when you have signal.");
+  sendPending(true);
+  stopMapModes(); setDraft([]);
+  current ? startVisit(current) : showHome();
+}
+
+/* one question */
+function question(q, e) {
+  const a = e.answers, wrap = el("div", { class: "q-wrap" }); wrap.dataset.q = q.id;
+  wrap.append(el("label", { class: "q" }, [document.createTextNode(q.label), q.required ? el("span", { class: "req", text: " *" }) : null]));
+  if (q.help) wrap.append(el("div", { class: "help", text: q.help }));
+  const set = (v, rerender) => { if (v == null || v === "" || (Array.isArray(v) && !v.length)) delete a[q.id]; else a[q.id] = v; changed(e, rerender); };
+  const rerenderOnChange = Q.questions.some(x => x.showIf && x.showIf.q === q.id);
+
+  if (q.type === "yesno" || q.type === "choice") {
+    const opts = q.type === "yesno" ? ["Yes", "No"] : optionsOf(q), box = el("div", { class: "opts", role: "group" });
+    opts.forEach(o => box.append(el("button", { type: "button", class: "opt" + (a[q.id] === o ? " on" : ""), "aria-pressed": String(a[q.id] === o), text: o, onclick: () => { set(a[q.id] === o ? null : o, true); } })));
+    wrap.append(box);
+  } else if (q.type === "multi") {
+    const cur = new Set(a[q.id] || []), box = el("div", { class: "opts", role: "group" });
+    optionsOf(q).forEach(o => box.append(el("button", { type: "button", class: "opt" + (cur.has(o) ? " on" : ""), "aria-pressed": String(cur.has(o)), text: o, onclick: () => { cur.has(o) ? cur.delete(o) : cur.add(o); set(optionsOf(q).filter(x => cur.has(x)), true); } })));
+    wrap.append(box);
+  } else if (q.type === "text" || q.type === "number" || q.type === "date") {
+    wrap.append(el("input", { type: q.type === "text" ? "text" : q.type, value: a[q.id] || "", inputmode: q.type === "number" ? "numeric" : null, oninput: ev => set(ev.target.value.trim(), false), onchange: () => rerenderOnChange && changed(e, true) }));
+  } else if (q.type === "longtext") {
+    const t = el("textarea", { oninput: ev => set(ev.target.value, false) }); t.value = a[q.id] || ""; wrap.append(t);
+  } else if (q.type === "photo") {
+    wrap.append(photoInput(q, e, set));
+  } else if (q.type === "gps") {
+    const g = a[q.id];
+    wrap.append(el("div", { class: "row" }, [
+      el("button", { type: "button", text: "Use my location", onclick: async () => { try { set(await locate(), true); } catch (er) { toast(er.message); } } }),
+      el("button", { type: "button", text: "Tap the map", onclick: () => tapMap("Tap the " + q.label.toLowerCase() + ".", ll => set({ ll, acc: null, how: "map" }, true)) })
+    ]));
+    if (g) wrap.append(el("p", { class: "coord", text: accText(g) + " · " + g.ll[1].toFixed(6) + ", " + g.ll[0].toFixed(6) }), el("button", { type: "button", class: "small danger", text: "Clear", onclick: () => set(null, true) }));
+  } else if (q.type === "polygon") {
+    wrap.append(polygonInput(q, e, set));
+  } else if (q.type === "points") {
+    wrap.append(pointsInput(q, e, set));
+  } else if (q.type === "markerRef") {
+    wrap.append(markerRefInput(q, e, set));
+  } else if (q.type === "people") {
+    wrap.append(peopleInput(q, e, set));
+  }
+  return wrap;
+}
+
+/* photos: shrunk on the phone to about 1600 px so they send quickly and fit the inbox */
+function shrink(file, max) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+      const c = document.createElement("canvas"); c.width = Math.round(w * s); c.height = Math.round(h * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let q = 0.82, out = c.toDataURL("image/jpeg", q);
+      while (out.length > 1800000 && q > 0.4) { q -= 0.12; out = c.toDataURL("image/jpeg", q); }
+      ok(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error("That photo couldn't be read.")); };
+    img.src = url;
+  });
+}
+function photoInput(q, e, set) {
+  const list = e.answers[q.id] || [], max = q.max || 3, box = el("div");
+  const input = el("input", { type: "file", accept: "image/*", capture: "environment", class: "hidden" });
+  input.onchange = async () => {
+    const files = [...input.files].slice(0, max - list.length);
+    for (const f of files) { try { list.push(await shrink(f, 1600)); } catch (er) { toast(er.message); } }
+    set(list.slice(), true);
+  };
+  const pick = el("input", { type: "file", accept: "image/*", multiple: true, class: "hidden" });
+  pick.onchange = async () => { const files = [...pick.files].slice(0, max - list.length); for (const f of files) { try { list.push(await shrink(f, 1600)); } catch (er) { toast(er.message); } } set(list.slice(), true); };
+  box.append(input, pick, el("div", { class: "row" }, [
+    el("button", { type: "button", text: "Take photo", disabled: list.length >= max, onclick: () => input.click() }),
+    el("button", { type: "button", text: "Choose photo", disabled: list.length >= max, onclick: () => pick.click() })
+  ]));
+  const th = el("div", { class: "thumbs" });
+  list.forEach((src, i) => th.append(el("div", {}, [el("img", { src, alt: "Photo " + (i + 1) }), el("button", { type: "button", "aria-label": "Remove photo", text: "✕", onclick: () => { list.splice(i, 1); set(list.slice(), true); } })])));
+  box.append(th, el("div", { class: "help", style: "margin-top:6px", text: list.length + " of " + max }));
+  return box;
+}
+
+/* boundary: walk the corners with GPS, or tap them on the aerial map */
+function currentBoundary(cid) {
+  const f = BOUNDS.features.find(x => x.properties && String(x.properties.CEMETERY_ID) === cid && x.geometry && x.geometry.type === "Polygon");
+  if (!f) return null;
+  const ring = f.geometry.coordinates[0].slice(), a = ring[0], z = ring[ring.length - 1];
+  if (ring.length > 1 && a[0] === z[0] && a[1] === z[1]) ring.pop();
+  return ring;
+}
+function polygonInput(q, e, set) {
+  const pts = (e.answers[q.id] || []).slice(), box = el("div");
+  let removing = false;
+  const commit = () => { set(pts.length ? pts.slice() : null, false); if (!pts.length) delete e.answers.boundary_source; drawCemDraft(e); refresh(); drawHandles(); };
+  const add = p => { if (!e.answers.boundary_source) e.answers.boundary_source = "new"; pts.push(p); commit(); };
+  const drawHandles = () => {
+    clearHandles();
+    pts.forEach((p, i) => handle(p.ll, "vtx" + (removing ? " rm" : ""), { label: "Corner " + (i + 1), drag: removing ? null : ll => { pts[i] = { ll, acc: null, how: "moved" }; commit(); }, click: removing ? () => { pts.splice(i, 1); commit(); } : null }));
+    if (!removing && pts.length >= 2) pts.forEach((p, i) => { const n = pts[(i + 1) % pts.length]; if (i === pts.length - 1 && pts.length < 3) return;
+      handle([r6((p.ll[0] + n.ll[0]) / 2), r6((p.ll[1] + n.ll[1]) / 2)], "mid", { label: "Add a corner here", click: () => { pts.splice(i + 1, 0, { ll: [r6((p.ll[0] + n.ll[0]) / 2), r6((p.ll[1] + n.ll[1]) / 2)], acc: null, how: "map" }); commit(); } }); });
+  };
+  const existing = currentBoundary(current.id);
+  if (existing && !pts.length) box.append(el("button", { type: "button", class: "primary big", text: "Fix the current boundary", onclick: () => {
+    existing.forEach(ll => pts.push({ ll: ll.slice(), acc: null, how: "existing" })); e.answers.boundary_source = "edited"; commit(); toast("Drag the yellow corners. Tap a small dot to add a corner between two.", 4000); } }),
+    el("p", { class: "help", text: "Or start fresh below." }));
+  const info = el("p", { class: "coord" });
+  const refresh = () => { info.textContent = pts.length ? pts.length + " corner" + (pts.length === 1 ? "" : "s") + (pts.length >= 3 ? " · closed shape" : " · need at least 3") : "No corners yet."; };
+  let drawing = false;
+  const drawBtn = el("button", { type: "button", text: "Draw on the map" });
+  const keepTapping = () => tapMap("Tap each corner in order. Tap Done when finished.", ll => { add({ ll, acc: null, how: "map" }); if (drawing) { keepTapping(); NODES.cancel.textContent = "Done"; } });
+  const stop = () => { drawing = false; drawBtn.textContent = "Draw on the map"; };
+  drawBtn.onclick = () => { if (drawing) { stopMapModes(); return; } drawing = true; drawBtn.textContent = "Stop drawing"; cancelHook = stop; keepTapping(); };
+  box.append(el("div", { class: "row" }, [
+    el("button", { type: "button", class: "primary", text: "Add corner here (GPS)", onclick: async () => { try { add(await locate()); } catch (er) { toast(er.message); } } }),
+    drawBtn
+  ]), info, el("div", { class: "row" }, [
+    el("button", { type: "button", class: "small", text: "Undo last corner", onclick: () => { pts.pop(); set(pts.slice(), false); drawCemDraft(e); refresh(); } }),
+    el("button", { type: "button", class: "small", text: "Remove corners", onclick: ev => { removing = !removing; ev.target.textContent = removing ? "Done removing" : "Remove corners"; if (removing) toast("Tap a red corner to remove it."); drawHandles(); } }),
+    el("button", { type: "button", class: "small danger", text: "Clear / redraw", onclick: () => { if (!pts.length || confirm("Clear all corners and start over?")) { pts.length = 0; commit(); const y = window.scrollY; renderForm(e); window.scrollTo(0, y); } } })
+  ]), el("p", { class: "help", text: "Drag a yellow corner to move it. Tap a small white dot to add a corner between two." }));
+  refresh(); setTimeout(drawHandles, 0);
+  return box;
+}
+
+/* hazard spots: any number, each with a place, a type and a note */
+function pointsInput(q, e, set) {
+  const list = (e.answers[q.id] || []).slice(), box = el("div"), opts = optionsOf(q);
+  list.forEach((p, i) => {
+    const typeSel = el("select", { "aria-label": "Hazard type", onchange: ev => { p.type = ev.target.value; set(list.slice(), false); } }, [el("option", { value: "", text: "What is it?" })].concat(opts.map(o => el("option", { value: o, text: o, selected: p.type === o }))));
+    const note = el("input", { type: "text", placeholder: "Note (e.g. marked from the road)", value: p.note || "", oninput: ev => { p.note = ev.target.value; set(list.slice(), false); } });
+    box.append(el("div", { class: "sub" }, [el("div", { class: "coord", text: "Spot " + (i + 1) + " · " + accText(p.where) }), typeSel, el("div", { style: "height:6px" }), note,
+      el("button", { type: "button", class: "small danger", style: "margin-top:6px", text: "Remove spot", onclick: () => { list.splice(i, 1); set(list.slice(), true); } })]));
+  });
+  const addAt = where => { list.push({ where, type: "", note: "" }); set(list.slice(), true); };
+  box.append(el("div", { class: "row" }, [
+    el("button", { type: "button", text: "Add spot: my location", onclick: async () => { try { addAt(await locate()); } catch (er) { toast(er.message); } } }),
+    el("button", { type: "button", text: "Add spot: tap map", onclick: () => tapMap("Tap where the hazard is.", ll => addAt({ ll, acc: null, how: "map" })) })
+  ]));
+  return box;
+}
+function drawCemDraft(e) {
+  const a = e.answers, f = [];
+  if (a.boundary && a.boundary.length) {
+    const ring = a.boundary.map(p => p.ll);
+    f.push(ring.length >= 3 ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring.concat([ring[0]])] } } : { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: ring.length > 1 ? ring : [ring[0], ring[0]] } });
+    ring.forEach(p => f.push({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: p } }));
+  }
+  if (a.entrance_point) f.push({ type: "Feature", properties: { color: "#22c55e" }, geometry: { type: "Point", coordinates: a.entrance_point.ll } });
+  (a.hazard_spots || []).forEach(h => f.push({ type: "Feature", properties: { color: "#ef4444" }, geometry: { type: "Point", coordinates: h.where.ll } }));
+  // entrances that were moved or removed: their old spots, faded
+  if (a.entrances) (a._entrances_orig || []).forEach((o, i) => { const now = a.entrances.find(en => en._i === i); if (!now || !sameLL(now.coords, o.coords)) f.push({ type: "Feature", properties: { color: "#d1d5db" }, geometry: { type: "Point", coordinates: o.coords } }); });
+  setDraft(f);
+}
+
+/* "belongs to": the nearest markers, so a footstone or fragment can be linked to its headstone */
+function markerRefInput(q, e, set) {
+  const box = el("div"), sel = el("select", { onchange: ev => set(ev.target.value, false) }, [el("option", { value: "", text: "Not sure / none" })]);
+  box.append(sel);
+  sessionMarkers(current.id).then(extra => {
+    const here = e.where && e.where.ll, all = stonesIn(current.id).concat(extra.filter(x => x.entry !== e.id));
+    const near = here ? all.map(s => Object.assign({}, s, { d: dist(here, s.ll) })).sort((a, b) => a.d - b.d).slice(0, 8) : all.slice(0, 8);
+    near.forEach(s => sel.append(el("option", { value: s.id, selected: e.answers[q.id] === s.id, text: (s.names.join(", ") || s.id) + (s.d != null ? " · " + miles(s.d) + " away" : "") })));
+    if (!near.length) box.append(el("p", { class: "help", text: "No markers nearby yet." }));
+  });
+  return box;
+}
+
+/* the people named on a stone */
+function peopleInput(q, e, set) {
+  const list = (e.answers[q.id] || []).map(p => Object.assign({}, p)), box = el("div");
+  const F = [["first", "First name"], ["last", "Last name"], ["birth", "Born (as written)"], ["death", "Died (as written)"]];
+  list.forEach((p, i) => {
+    const sub = el("div", { class: "sub" }, [el("div", { class: "coord", text: "Person " + (i + 1) })]);
+    F.forEach(([k, lab]) => sub.append(el("input", { type: "text", placeholder: lab, "aria-label": lab, value: p[k] || "", style: "margin:4px 0", oninput: ev => { p[k] = ev.target.value; set(list.map(x => Object.assign({}, x)), false); } })));
+    const sx = el("div", { class: "opts", style: "margin-top:4px" });
+    [["F", "Female"], ["M", "Male"], ["U", "Unknown"]].forEach(([v, t]) => sx.append(el("button", { type: "button", class: "opt" + (p.sex === v ? " on" : ""), text: t, onclick: () => { p.sex = p.sex === v ? "" : v; set(list.map(x => Object.assign({}, x)), true); } })));
+    sub.append(sx, el("button", { type: "button", class: "small danger", style: "margin-top:6px", text: "Remove person", onclick: () => { list.splice(i, 1); set(list, true); } }));
+    box.append(sub);
+  });
+  box.append(el("button", { type: "button", text: list.length ? "Add another person" : "Add a person", onclick: () => { list.push({}); set(list, true); } }));
+  return box;
+}
+
+/* ---------------- sending ---------------- */
+let sending = false;
+function packForInbox(e) {   // photos travel separately from the answers; answers point at them as "media:N"
+  const media = [], data = JSON.parse(JSON.stringify(e.answers));
+  const take = src => { const m = /^data:([^;]+);base64,(.*)$/.exec(src || ""); if (!m) return null; media.push({ mime: m[1], data: m[2] }); return "media:" + (media.length - 1); };
+  Q.questions.forEach(q => { if (q.type === "photo" && Array.isArray(data[q.id])) data[q.id] = data[q.id].map(take).filter(Boolean); });
+  data._cemetery = e.cemetery; data._where = e.where; data._kind = e.kind; data._form = Q.version || 1;
+  if (e.moved) data._moved = { from: e.moved.from, to: e.where.ll };
+  return { id: e.id, kind: "survey", target: e.target, data, media: media.slice(0, 6), created: e.created, submitter: invite && invite.name || "" };
+}
+async function sendPending(quiet) {
+  if (sending || !navigator.onLine || !invite || invite.revoked) return;
+  const pend = (await DB.all()).filter(e => mine(e) && e.status === "pending");
+  if (!pend.length) { if (!quiet) toast("Nothing waiting to send."); return; }
+  sending = true; let sent = 0, failed = "";
+  for (const e of pend) {                               // one at a time: a big photo batch on weak signal is more likely to get through
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/submit", { method: "POST", headers: { "Content-Type": "application/json", "X-Invite": invite.code }, body: JSON.stringify(packForInbox(e)) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { e.status = "sent"; e.sentAt = new Date().toISOString(); e.error = ""; await DB.put(e); sent++; }
+      else { if (r.status === 403) { invite.revoked = true; store.set("invite:" + AREA, JSON.stringify(invite)); } e.error = j.error || ("Inbox said " + r.status); await DB.put(e); failed = e.error; if (r.status === 403) break; }
+    } catch (er) { failed = "No connection to the inbox. It will try again."; break; }
+  }
+  sending = false;
+  if (sent) toast("Sent " + sent + " survey" + (sent === 1 ? "" : "s") + ". Thank you!");
+  else if (failed && !quiet) toast(failed);
+  if (!current && !$("formBox")) showHome();
+}
+async function pruneSent() { const old = Date.now() - 14 * 864e5; for (const e of await DB.all()) if (e.status === "sent" && e.sentAt && Date.parse(e.sentAt) < old) await DB.del(e.id); }
+
+/* the safety net: everything not yet sent, as one file the lead can import */
+async function exportUnsent() {
+  const list = (await DB.all()).filter(e => mine(e) && e.status !== "sent");
+  if (!list.length) return toast("Nothing unsent.");
+  const blob = new Blob([JSON.stringify({ type: "cemetery-survey-export", area: AREA, invite: invite && invite.code, surveyor: invite && invite.name, exported: new Date().toISOString(), submissions: list.map(packForInbox) })], { type: "application/json" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: AREA + "-surveys-" + new Date().toISOString().slice(0, 10) + ".json" });
+  document.body.append(a); a.click(); a.remove(); toast("Saved. Send that file to your county lead.");
+}
+
+boot();
+</script>
+<script>
+// Ask the phone not to clear saved surveys when it runs low on space
+if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
+// Offline: sw.js keeps a copy of this page and its data so it opens with no signal
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+</script>
+</body>
+</html>

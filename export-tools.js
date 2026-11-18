@@ -1,327 +1,415 @@
-/* export-tools.js - three additions to the editor's File menu and Setup:
+/* stories.js - "Stories and memories" on the grave and cemetery cards, and the "Share a story" form.
+   Loaded by the map page (index.html) after its own script. It does not change the map; it only adds to the cards.
 
-     Export for GIS   one .zip with the map as shapefiles (ArcGIS, ThinkGIS), GeoJSON (ArcGIS Online, QGIS) and tables
-     Back Up Everything   one .zip with every file of the site, the photos, and a copy of the inbox
-     Photo Folders    (Setup > Map and Look) where pictures are kept, for when they move off this site
-
-   It only reads the editor's data; it changes nothing except the photo folder settings.
-   Load it after shell.js:  <script src="export-tools.js"></script>
-*/
+   - Approved stories come from stories.csv (or settings.json files.stories). Columns:
+       STORY_ID, TARGET_TYPE (marker | cemetery), TARGET_ID, CEMETERY_ID, PERSON, TEXT, QUOTE, TOLD_BY, CONNECTION,
+       DATE_TOLD, TAG (Family account | Personal memory | Documented), SOURCE, PHOTO,
+       MEDIA (video or audio: links or files, separated by " | "; see media.js)
+     The editor writes this file when the lead approves a story. A missing file just means no stories yet.
+   - Shared stories go to the county inbox (settings.json "inbox") and wait there for the lead.
+   - The map page tells this file what a card shows by setting infoContent.dataset.storyFor just before it draws the card. */
 (function () {
   "use strict";
-  const mk = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); (kids || []).forEach(k => e.append(k)); return e; };
-  const enc = new TextEncoder();
-  const today = () => new Date().toISOString().slice(0, 10);
-  const area = () => String(S.idPrefix || S.shortName || "map").toUpperCase();
-  const num = v => { const n = parseFloat(v); return String(v == null ? "" : v).trim() !== "" && isFinite(n) ? n : null; };
-  const fmtSize = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB";
+  if (typeof infoContent === "undefined") return;
+  const SETTINGS = (typeof SET !== "undefined" && SET) || {};
+  const AREA = String(SETTINGS.idPrefix || SETTINGS.shortName || "").toUpperCase();
+  const INBOX = String(SETTINGS.inbox || "").replace(/\/+$/, "");
+  const FILE = (SETTINGS.files && SETTINGS.files.stories) || "stories.csv";
+  const H = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const key = s => String(s == null ? "" : s).trim().toLowerCase();
 
-  /* ================= a small .zip writer (files are stored as they are; photos are already compressed) ================= */
-  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
-  function Zip() {
-    const parts = [], central = [], seen = new Set(); let offset = 0;
-    const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
-    return {
-      count: () => central.length / 2, size: () => offset,
-      async add(name, data) {
-        name = String(name).replace(/^\/+/, ""); if (seen.has(name)) return; seen.add(name);
-        const u8 = data instanceof Uint8Array ? data : typeof data === "string" ? enc.encode(data) : new Uint8Array(await data.arrayBuffer());
-        const nm = enc.encode(name), crc = crc32(u8);
-        if (central.length / 2 >= 65535 || offset + u8.length + nm.length + 30 > 0xFFFFFF00) throw new Error("This is too big for one .zip file (over 4 GB). Untick the photos or the old map images and back those up separately.");
-        const h = new DataView(new ArrayBuffer(30));
-        h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
-        h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true); h.setUint32(18, u8.length, true); h.setUint32(22, u8.length, true);
-        h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
-        parts.push(h.buffer, nm, u8.length > 65536 ? new Blob([u8]) : u8);
-        const c = new DataView(new ArrayBuffer(46));
-        c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
-        c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, u8.length, true); c.setUint32(24, u8.length, true);
-        c.setUint16(28, nm.length, true); c.setUint32(42, offset, true);
-        central.push(c.buffer, nm); offset += 30 + nm.length + u8.length;
-      },
-      blob() {
-        let csize = 0; central.forEach(p => csize += p.byteLength);
-        const e = new DataView(new ArrayBuffer(22)), n = central.length / 2;
-        e.setUint32(0, 0x06054b50, true); e.setUint16(8, n, true); e.setUint16(10, n, true); e.setUint32(12, csize, true); e.setUint32(16, offset, true);
-        return new Blob(parts.concat(central, [e.buffer]), { type: "application/zip" });
-      }
+  /* ---------- styles ---------- */
+  const css = document.createElement("style");
+  css.textContent = `
+  html,body,button,input,select,textarea{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .st-sec{margin:14px 0 6px;padding-top:10px;border-top:1px solid #d8d2c6}
+  .st-svy{margin:12px 0 4px}.st-svy button{width:100%;min-height:44px;padding:8px 14px;border-radius:8px;border:0;background:var(--accent,#01796F)!important;color:#fff!important;font:inherit;font-weight:600;cursor:pointer}
+  .st-svy small{display:block;margin-top:4px;color:#5b6470;font-size:12.5px}
+  .st-sec h3{margin:0 0 8px}
+  .st-quote{font:italic 1.15em/1.45 Georgia,"Times New Roman",serif;margin:4px 0 12px;padding-left:12px;border-left:3px solid var(--accent,#01796F)}
+  .st-item{margin:0 0 12px}
+  .st-item p{margin:0 0 4px;white-space:pre-wrap}
+  .st-meta{font-size:.85em;color:#5f574c}
+  .st-tag{display:inline-block;font-size:.75em;padding:1px 8px;border-radius:999px;background:#eee7da;color:#5f574c;margin-left:4px}
+  .st-item img{max-width:100%;border-radius:8px;margin:4px 0}
+  .st-share{min-height:44px;padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#01796F);background:#fff;color:var(--accent,#01796F);font:inherit;font-weight:600;cursor:pointer}
+  .stm{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+  .stm[hidden]{display:none}
+  .stm .box{background:#fff;color:#1f1b16;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+  @media(min-width:700px){.stm{align-items:center}.stm .box{border-radius:14px}}
+  .stm h2{margin:0 0 4px;font-size:1.2em}
+  .stm label{display:block;font-weight:600;margin:12px 0 4px}
+  .stm input[type=text],.stm input[type=email],.stm textarea,.stm select{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #b9b1a3;border-radius:8px}
+  .stm textarea{min-height:140px;resize:vertical}
+  .stm .hint{font-size:.85em;color:#5f574c;font-weight:400;margin:2px 0 0}
+  .stm .chk{display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px}
+  .stm .chk input{margin-top:4px;width:20px;height:20px;flex:none}
+  .stm .row{display:flex;gap:8px;margin-top:16px}
+  .stm .box,.stm .box *{text-shadow:none}
+  .stm input,.stm textarea,.stm select{color:#1f1b16!important;background:#fff!important}
+  .stm .row button{flex:1;min-height:48px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #8a8174!important;background:#fff!important;color:#1f1b16!important;box-shadow:none!important;text-transform:none;letter-spacing:normal}
+  .stm .row button.go{background:var(--accent,#01796F)!important;border-color:var(--accent,#01796F)!important;color:#fff!important}
+  .stm .row button:disabled{opacity:.55}
+  #lead-badge[hidden]{display:none!important}
+  .stm .ok{color:#1d6b3a}.stm hr{border:0;border-top:1px solid #e5dfd3;margin:16px 0}
+  .st-share{background:#fff!important;color:var(--accent,#01796F)!important;border:1px solid var(--accent,#01796F)!important}
+  .stm .msg{margin-top:10px;font-size:.95em}
+  .stm .msg.err{color:#9b1c1c}
+  .stm .thumb{max-width:120px;border-radius:8px;display:block;margin-top:6px}`;
+  document.head.append(css);
+
+  /* ---------- signing in on the map: volunteers type their invite code, leads type the lead key ---------- */
+  const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };
+  const inviteKey = "invite:" + AREA, leadKeyName = "leadKey:" + AREA;
+  const invite = () => { try { return JSON.parse(store.get(inviteKey) || "null"); } catch (e) { return null; } };
+  /* a block at the top of the map menu, so volunteers and the lead can find it:
+       not signed in:  ○ Volunteer / Lead Sign-In (Not Signed In)   ○ Want to help with the surveys? Tap here!
+       lead signed in: ⦿ Sign-In  ⦿ Invite Volunteers  ⦿ Review Changes and Additions
+       signed in:      ⦿ Volunteer / Lead Sign-In (Signed In)       ⦿ Survey / Make Changes (as Name)   ⦿ Review Changes and Additions (lead only) */
+  const panel = document.getElementById("menu-panel");
+  const group = document.createElement("div"); group.id = "vol-group";
+  const gcss = document.createElement("style");
+  gcss.textContent = "#vol-group{margin:10px 0 12px;padding:8px;border:2px solid var(--accent,#01796F);border-radius:10px;background:#fff}" +
+    "#vol-group a{display:flex!important;align-items:center;gap:10px;min-height:44px;padding:4px 6px;color:var(--accent,#01796F);font-weight:600;text-decoration:none;border-radius:6px}" +
+    "#vol-group a:hover{background:#f1efe8}#vol-group a+a{border-top:1px solid #ebe6da}" +
+    "#vol-group .dot{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}" +
+    "#vol-group .dot.on{background:radial-gradient(circle,currentColor 0 4px,transparent 5px)}" +
+    "#vol-group small{display:block;font-weight:400;color:#5f574c;font-size:12px}";
+  document.head.append(gcss);
+  function helpTarget() {
+    const c = SETTINGS.contact || {};
+    if (c.form) return { href: c.form, how: "Fill in the volunteer form" };
+    if (c.email) return { href: "mailto:" + c.email + "?subject=" + encodeURIComponent("Helping with the " + (SETTINGS.name || "cemetery") + " survey"), how: "Email " + (c.name || c.email) };
+    if (c.phone) return { href: "tel:" + String(c.phone).replace(/[^0-9+]/g, ""), how: "Call " + (c.name || c.phone) };
+    return { href: "survey.html", how: "Find out how to get an invite" };
+  }
+  function link(text, sub, href, on, onclick) {
+    const a = document.createElement("a"); a.href = href;
+    a.innerHTML = '<span class="dot' + (on ? " on" : "") + '" aria-hidden="true"></span><span>' + H(text) + (sub ? "<small>" + H(sub) + "</small>" : "") + "</span>";
+    if (onclick) a.addEventListener("click", e => { e.preventDefault(); onclick(); });
+    if (/^(https?:|mailto:|tel:)/.test(href)) { a.target = "_blank"; a.rel = "noopener"; }
+    group.append(a);
+  }
+  // "Signed in as Sam (Lead)". The role and name come from the inbox (/whoami) and are remembered on this device.
+  const whoKey = "leadWho:" + AREA;
+  function signedAs(inv, lead) {
+    if (lead) {
+      let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
+      if (w && w.role === "owner") return "Signed in as a Manager";
+      if (w && w.name) return "Signed in as " + w.name + " (Lead)";
+      return "Signed in as a Lead";
+    }
+    if (inv) return "Signed in as " + (inv.name || "a surveyor") + " (Volunteer)";
+    return "Not signed in";
+  }
+  function learnWho(key) {
+    if (!key || !INBOX || !AREA) return;
+    fetch(INBOX + "/" + AREA + "/whoami", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
+      if (j && j.ok) { store.set(whoKey, JSON.stringify({ role: j.role, name: j.name || "" })); menu(); const h = document.querySelector("#si-lead h3"); if (h && store.get(leadKeyName)) h.textContent = signedAs(null, store.get(leadKeyName)); }
+    }).catch(() => {});
+  }
+  // Leads and managers survey too. The survey works with invites, so the first time a lead starts one,
+  // an invite in their own name is made quietly and kept on this device (it shows in the Surveyors list).
+  async function ensureInvite() {
+    const inv = invite(); if (inv && inv.code) return true;
+    const lead = store.get(leadKeyName); if (!lead || !INBOX || !AREA) return false;
+    let w = null; try { w = JSON.parse(store.get(whoKey) || "null"); } catch (e) {}
+    const name = (w && w.role === "lead" && w.name) ? w.name + " (lead)" : "Manager";
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
+      if (!j.ok || !j.code) { alert(j.error || "Couldn't start the survey. Try again."); return false; }
+      store.set(inviteKey, JSON.stringify({ code: j.code, name: j.name || name })); return true;
+    } catch (e) { alert("Couldn't reach the inbox. Check your connection."); return false; }
+  }
+  async function goSurvey(params) {
+    if (!(await ensureInvite())) return;
+    location.href = "survey.html" + (params ? "?" + new URLSearchParams(params).toString() : "");
+  }
+  function menu() {
+    if (!panel) return;
+    const inv = invite(), lead = store.get(leadKeyName), signed = !!(inv || lead);
+    group.textContent = "";
+    link("Volunteer / Lead Sign-In", signedAs(inv, lead), "#", signed, openSignIn);
+    if (inv || lead) link("Start a Survey", "Record cemeteries and graves, or update one from its card", "survey.html", true, () => goSurvey());
+    if (lead) link("Invite Volunteers", "Show a QR code to sign someone up", "#", true, openSignIn);   // a lead doesn't need the "how to help" link
+    if (!inv && !lead) { const h = helpTarget(); link("Want to help with the surveys? Tap here!", h.how, h.href, false); }
+    if (lead) link("Review Changes and Additions", "Opens the editor", "editor.html", true);
+    if (!group.parentNode) { const title = panel.querySelector(".menu-title"); title ? title.after(group) : panel.prepend(group); }
+  }
+  if (INBOX && AREA) menu();
+
+  /* the lead's red badge: only in a browser where the lead key is saved */
+  const badge = document.createElement("a");
+  badge.href = "editor.html"; badge.id = "lead-badge"; badge.hidden = true;
+  badge.style.cssText = "position:fixed;z-index:9998;left:10px;top:calc(70px + env(safe-area-inset-top));background:#c62828;color:#fff;padding:8px 12px;border-radius:999px;font:600 14px system-ui,sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.3)";
+  badge.title = "Only you see this, because your lead key is saved in this browser.";
+  document.body.append(badge);
+  function checkBadge() {
+    const key = store.get(leadKeyName); if (!key || !INBOX || !AREA) { badge.hidden = true; return; }
+    fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } }).then(r => r.ok ? r.json() : null).then(j => {
+      if (!j || !j.ok) { badge.hidden = true; return; }
+      badge.textContent = "\u25CF " + j.total + " new for review"; badge.hidden = !j.total;
+    }).catch(() => {});
+  }
+  checkBadge(); if (store.get(leadKeyName) && !store.get(whoKey)) learnWho(store.get(leadKeyName)); setInterval(() => { if (!document.hidden) checkBadge(); }, 300000);
+
+  const si = document.createElement("div");
+  si.id = "si-modal"; si.className = "stm"; si.hidden = true; si.setAttribute("role", "dialog"); si.setAttribute("aria-modal", "true"); si.setAttribute("aria-labelledby", "si-title");
+  si.innerHTML = `<div class="box"><h2 id="si-title">Volunteer & Lead Sign-In</h2>
+    <p class="hint">For people helping record the cemeteries. Visitors don't need to sign in.</p>
+    <div id="si-vol"></div><hr id="si-sep"><div id="si-lead"></div>
+    <div class="row"><button type="button" id="si-close">Close</button></div></div>`;
+  document.body.append(si);
+  si.addEventListener("click", e => { if (e.target === si) si.hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !si.hidden) si.hidden = true; });
+  si.querySelector("#si-close").addEventListener("click", () => { si.hidden = true; });
+  function section(box, html) { box.innerHTML = html; return id => box.querySelector("#" + id); }
+  function drawSignIn() {
+    const inv = invite(), lead = store.get(leadKeyName);
+    // a signed-in lead or manager only sees their own section, so "Invite" can't be mistaken for anything else
+    si.querySelector("#si-vol").hidden = !!lead; si.querySelector("#si-sep").hidden = !!lead;
+    const v = section(si.querySelector("#si-vol"), inv
+      ? '<h3>Volunteer</h3><p class="ok">Signed in' + (inv.name ? " as " + H(inv.name) : "") + ' on this device.</p><div class="row"><button type="button" class="go" id="si-go">Open the survey</button><button type="button" id="si-out">Sign out</button></div>'
+      : '<h3>Volunteer</h3><p class="hint">Have a QR code? Open your phone\'s camera, point it at the code, and tap the link that appears.</p><label for="si-code">Invite code</label><input type="text" id="si-code" autocomplete="off" autocapitalize="characters" placeholder="K7Q2-M9XD"><p class="hint">Or type the code from your invite link (the part after invite=).</p><div class="row"><button type="button" class="go" id="si-in">Sign in</button></div><div class="msg" id="si-vmsg" role="status"></div>');
+    if (inv) { v("si-go").onclick = () => { location.href = "survey.html"; }; v("si-out").onclick = () => { if (confirm("Sign out of surveying on this device? Surveys not yet sent stay saved on it.")) { store.set(inviteKey, ""); drawSignIn(); menu(); } }; }
+    else v("si-in").onclick = async () => {
+      const code = v("si-code").value.trim().toUpperCase().replace(/^.*INVITE=/, ""), m = v("si-vmsg");
+      if (!code) { m.textContent = "Type your invite code."; m.className = "msg err"; return; }
+      m.textContent = "Checking…"; m.className = "msg";
+      try { const r = await fetch(INBOX + "/" + AREA + "/check", { headers: { "X-Invite": code } }), j = await r.json();
+        if (!j.ok) { m.textContent = j.error || "That code didn't work."; m.className = "msg err"; return; }
+        store.set(inviteKey, JSON.stringify({ code, name: j.name })); drawSignIn(); menu();
+      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
+    };
+    const l = section(si.querySelector("#si-lead"), lead
+      ? '<h3>' + H(signedAs(null, lead)) + '</h3><p class="ok">New additions show as a red badge on the map.</p>' +
+        '<div class="row"><button type="button" class="go" id="si-svy">Start a Survey</button></div>' +
+        '<h3 style="margin-top:18px">Invite a new volunteer</h3><p class="hint">Type the volunteer\'s name, then let them scan the QR code with their phone\'s camera.</p>' +
+        '<label for="si-new">Volunteer\'s name</label><input type="text" id="si-new" placeholder="Their name" autocomplete="off"><div class="row"><button type="button" class="go" id="si-inv">Invite and show QR code</button></div><div class="msg" id="si-imsg" role="status"></div>' +
+        '<div class="row"><button type="button" id="si-ed">Open the editor</button><button type="button" id="si-lout">Sign out</button></div>'
+      : '<h3>Lead or manager</h3><label for="si-key">Lead or manager key</label><input type="password" id="si-key" autocomplete="off"><div class="row"><button type="button" class="go" id="si-lin">Sign in</button></div><div class="msg" id="si-lmsg" role="status"></div>');
+    if (lead) {
+      l("si-ed").onclick = () => { location.href = "editor.html"; };
+      l("si-svy").onclick = () => goSurvey();
+      l("si-lout").onclick = () => { store.set(leadKeyName, ""); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); };
+      const invite1 = async () => {
+        const name = l("si-new").value.trim(), m = l("si-imsg");
+        if (!name) { m.textContent = "Type their name first."; m.className = "msg err"; l("si-new").focus(); return; }
+        m.textContent = "Making the invite…"; m.className = "msg";
+        try {
+          const r = await fetch(INBOX + "/" + AREA + "/invites", { method: "POST", headers: { "Content-Type": "application/json", "X-Lead-Key": lead }, body: JSON.stringify({ name }) }), j = await r.json();
+          if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
+          await needQR();
+          l("si-new").value = ""; m.textContent = "Invited " + j.name + "."; m.className = "msg ok";
+          QR.show({ title: "Welcome, " + j.name + "!", sub: "Scan with your phone's camera to start surveying", link: new URL("survey.html?invite=" + encodeURIComponent(j.code), document.baseURI).href, onNext: () => { l("si-new").focus(); } });
+        } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
+      };
+      l("si-inv").onclick = invite1;
+      l("si-new").addEventListener("keydown", e => { if (e.key === "Enter") invite1(); });
+    }
+    else l("si-lin").onclick = async () => {
+      const key = l("si-key").value.trim(), m = l("si-lmsg");
+      if (!key) { m.textContent = "Type the lead key."; m.className = "msg err"; return; }
+      m.textContent = "Checking…"; m.className = "msg";
+      try { const r = await fetch(INBOX + "/" + AREA + "/count", { headers: { "X-Lead-Key": key } });
+        if (r.status === 403) { m.textContent = "That lead key isn't right."; m.className = "msg err"; return; }
+        const j = await r.json(); if (!j.ok) { m.textContent = j.error || "That didn't work."; m.className = "msg err"; return; }
+        store.set(leadKeyName, key); store.set(whoKey, ""); drawSignIn(); menu(); checkBadge(); learnWho(key);
+      } catch (e) { m.textContent = "Couldn't reach the inbox. Check your connection."; m.className = "msg err"; }
     };
   }
-  function download(name, blob) { const a = mk("a", { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+  let qrReady = null;
+  const needQR = () => qrReady || (qrReady = window.QR ? Promise.resolve() : new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "qr.js"; sc.onload = ok; sc.onerror = () => bad(new Error("qr.js missing")); document.head.append(sc); }));
+  function openSignIn() { drawSignIn(); si.hidden = false; const f = si.querySelector("input"); if (f) f.focus(); }
 
-  /* ================= shapefiles (.shp .shx .dbf .prj .cpg), WGS 84 latitude / longitude ================= */
-  const PRJ = 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]';
-  // dBase column names: 10 characters, capitals, digits and _ only, each one different
-  function shortNames(cols) {
-    const used = new Set();
-    return cols.map(c => {
-      let b = ({ CEMETERY_ID: "CEM_ID", CEMETERY_NAME: "CEM_NAME" })[c] || String(c).toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "FIELD"; if (/^[0-9]/.test(b)) b = "F" + b;
-      let n = b.slice(0, 10), i = 2;
-      while (used.has(n)) { const s = String(i++); n = b.slice(0, 10 - s.length) + s; }
-      used.add(n); return n;
-    });
+  /* ---------- approved stories ---------- */
+  let STORIES = [];
+  function parseCsv(text) {
+    if (window.Papa) return Papa.parse(text.replace(/^﻿/, ""), { header: true, skipEmptyLines: "greedy" }).data;
+    return [];
   }
-  function utf8Clip(str, max) { let u = enc.encode(str); if (u.length <= max) return u; let n = max; while (n > 0 && (u[n] & 0xC0) === 0x80) n--; return u.slice(0, n); }
-  function ringArea(r) { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] * r[i][1]) - (r[i][0] * r[j][1]); return a / 2; }   // > 0 means counter-clockwise
-  // rows: [{ geom: [x, y]  or  [[ring, hole...], ...] (one entry per polygon), props: { column: value } }]
-  function shapefile(kind, rows, cols, numeric) {
-    const isPt = kind === "point", type = isPt ? 1 : 5;
-    const recs = [], box = [Infinity, Infinity, -Infinity, -Infinity], grow = (b, x, y) => { if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; };
-    rows.forEach(r => {
-      if (isPt) { const v = new DataView(new ArrayBuffer(20)); v.setInt32(0, 1, true); v.setFloat64(4, r.geom[0], true); v.setFloat64(12, r.geom[1], true); grow(box, r.geom[0], r.geom[1]); recs.push(v.buffer); return; }
-      const rings = [];
-      r.geom.forEach(poly => poly.forEach((ring, i) => {
-        let g = ring.map(p => [+p[0], +p[1]]); if (g.length < 3) return;
-        const a = g[0], z = g[g.length - 1]; if (a[0] !== z[0] || a[1] !== z[1]) g.push([a[0], a[1]]);
-        const ccw = ringArea(g) > 0; if (i === 0 ? ccw : !ccw) g.reverse();          // shapefiles: outer rings clockwise, holes counter-clockwise
-        rings.push(g);
-      }));
-      const np = rings.reduce((n, g) => n + g.length, 0), v = new DataView(new ArrayBuffer(44 + 4 * rings.length + 16 * np)), b = [Infinity, Infinity, -Infinity, -Infinity];
-      rings.forEach(g => g.forEach(p => { grow(b, p[0], p[1]); grow(box, p[0], p[1]); }));
-      v.setInt32(0, 5, true); b.forEach((x, i) => v.setFloat64(4 + 8 * i, x, true)); v.setInt32(36, rings.length, true); v.setInt32(40, np, true);
-      let o = 44, start = 0; rings.forEach(g => { v.setInt32(o, start, true); o += 4; start += g.length; });
-      rings.forEach(g => g.forEach(p => { v.setFloat64(o, p[0], true); v.setFloat64(o + 8, p[1], true); o += 16; }));
-      recs.push(v.buffer);
-    });
-    if (!recs.length) box.fill(0);
-    const head = (lenBytes) => { const v = new DataView(new ArrayBuffer(100)); v.setInt32(0, 9994, false); v.setInt32(24, lenBytes / 2, false); v.setInt32(28, 1000, true); v.setInt32(32, type, true); box.forEach((x, i) => v.setFloat64(36 + 8 * i, x, true)); return v; };
-    const total = 100 + recs.reduce((n, r) => n + 8 + r.byteLength, 0);
-    const shp = new Uint8Array(total), shx = new Uint8Array(100 + 8 * recs.length);
-    shp.set(new Uint8Array(head(total).buffer)); shx.set(new Uint8Array(head(shx.length).buffer));
-    const sv = new DataView(shp.buffer), xv = new DataView(shx.buffer); let off = 100;
-    recs.forEach((r, i) => {
-      sv.setInt32(off, i + 1, false); sv.setInt32(off + 4, r.byteLength / 2, false); shp.set(new Uint8Array(r), off + 8);
-      xv.setInt32(100 + 8 * i, off / 2, false); xv.setInt32(104 + 8 * i, r.byteLength / 2, false); off += 8 + r.byteLength;
-    });
+  const ready = fetch(new URL(FILE, document.baseURI).href, { cache: "no-cache" })
+    .then(r => r.ok ? r.text() : "").then(t => { STORIES = t ? parseCsv(t) : []; }).catch(() => { STORIES = []; });
 
-    /* the table (.dbf) */
-    const names = shortNames(cols), isNum = c => (numeric || []).includes(c);
-    const cells = rows.map(r => cols.map(c => { const v = r.props[c]; if (isNum(c)) { const n = num(v); return enc.encode(n == null ? "" : n.toFixed(7)); } return utf8Clip(String(v == null ? "" : v).replace(/[\r\n]+/g, " "), 254); }));
-    const lens = cols.map((c, i) => isNum(c) ? 14 : Math.max(1, ...cells.map(row => row[i].length)));
-    const recLen = 1 + lens.reduce((a, b) => a + b, 0), hdrLen = 32 + 32 * cols.length + 1;
-    const dbf = new Uint8Array(hdrLen + recLen * rows.length + 1).fill(32), dv = new DataView(dbf.buffer), now = new Date();
-    dbf.fill(0, 0, hdrLen); dbf[0] = 3; dbf[1] = now.getFullYear() - 1900; dbf[2] = now.getMonth() + 1; dbf[3] = now.getDate();
-    dv.setUint32(4, rows.length, true); dv.setUint16(8, hdrLen, true); dv.setUint16(10, recLen, true);
-    cols.forEach((c, i) => { const o = 32 + 32 * i; dbf.set(enc.encode(names[i]), o); dbf[o + 11] = isNum(c) ? 78 : 67; dbf[o + 16] = lens[i]; dbf[o + 17] = isNum(c) ? 7 : 0; });
-    dbf[hdrLen - 1] = 0x0D;
-    cells.forEach((row, r) => { let o = hdrLen + recLen * r + 1; row.forEach((u, i) => { dbf.set(u, isNum(cols[i]) ? o + lens[i] - u.length : o); o += lens[i]; }); });
-    dbf[dbf.length - 1] = 0x1A;
-    return { shp, shx, dbf, names };
+  function storiesFor(t) {
+    return STORIES.filter(s => key(s.TARGET_TYPE) === key(t.type) && key(s.TARGET_ID) === key(t.id) && String(s.TEXT || "").trim());
+  }
+  function sectionHtml(t, list) {
+    const featured = list.find(s => String(s.QUOTE || "").trim());
+    let h = '<div class="st-sec" data-st="1"><h3>Stories and memories' + (list.length ? " (" + list.length + ")" : "") + "</h3>";
+    if (featured) h += '<blockquote class="st-quote">“' + H(featured.QUOTE) + "”</blockquote>";
+    list.forEach(s => {
+      const who = [s.TOLD_BY, s.CONNECTION].filter(x => String(x || "").trim()).join(", ");
+      h += '<div class="st-item">' + (s.PERSON && t.type === "marker" ? '<div class="st-meta"><b>About ' + H(s.PERSON) + "</b></div>" : "") +
+        "<p>" + H(s.TEXT) + "</p>" +
+        (s.PHOTO ? '<img src="' + H(typeof photoUrl === "function" ? photoUrl(s.PHOTO) : s.PHOTO) + '" alt="Photo shared with this story" loading="lazy">' : "") +
+        (s.MEDIA && window.StoryMedia ? StoryMedia.html(s.MEDIA) : "") +
+        '<div class="st-meta">' + (who ? "Shared by " + H(who) : "Shared anonymously") + (s.DATE_TOLD ? " · " + H(s.DATE_TOLD) : "") +
+        (s.TAG ? '<span class="st-tag">' + H(s.TAG) + "</span>" : "") + (s.SOURCE ? "<br>Source: " + H(s.SOURCE) : "") + "</div></div>";
+    });
+    if (!list.length) h += '<p class="st-meta">No stories yet. Do you know something about ' + (t.type === "cemetery" ? "this place" : "this person") + "?</p>";
+    if (INBOX && AREA) h += '<button type="button" class="st-share">Share a story or memory</button> <button type="button" class="st-share st-fix">Suggest a correction</button>';
+    return h + "</div>";
   }
 
-  /* ================= the map as GIS layers ================= */
-  function layers() {
-    const byId = new Map(cems.map(r => [r.ID, r]));
-    const cemCols = cemF.slice(), L = [];
-    L.push({ name: "cemeteries", title: "Cemeteries (one point each)", kind: "point", cols: cemCols, numeric: ["LAT", "LONG"],
-      rows: cems.filter(r => num(r.LAT) != null && num(r.LONG) != null).map(r => ({ geom: [num(r.LONG), num(r.LAT)], props: r })) });
-    const join = cemCols.filter(c => !["ID", "NAME", "LAT", "LONG"].includes(c)), bCols = ["CEMETERY_ID", "NAME", "TYPE"].concat(join), bRows = [], eRows = [];
-    (bounds.features || []).forEach(f => {
-      const p = f.properties || {}, g = f.geometry || {}, c = byId.get(p.CEMETERY_ID) || {};
-      const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : null;
-      if (polys && polys.length) bRows.push({ geom: polys, props: Object.assign({}, c, { CEMETERY_ID: p.CEMETERY_ID || "", NAME: p.NAME || c.NAME || "", TYPE: p.TYPE || "BOUNDARY" }) });
-      (p.ENTRANCES || []).forEach(e => { if (e && e.coords && isFinite(e.coords[0]) && isFinite(e.coords[1])) eRows.push({ geom: [+e.coords[0], +e.coords[1]], props: { CEMETERY_ID: p.CEMETERY_ID || "", NAME: p.NAME || c.NAME || "", LABEL: e.label || "", SIZE: e.size || "", LAT: e.coords[1], LONG: e.coords[0] } }); });
-    });
-    L.push({ name: "boundaries", title: "Cemetery boundaries (areas)", kind: "polygon", cols: bCols, numeric: [], rows: bRows });
-    L.push({ name: "entrances", title: "Entrances (points)", kind: "point", cols: ["CEMETERY_ID", "NAME", "LABEL", "SIZE", "LAT", "LONG"], numeric: ["LAT", "LONG"], rows: eRows });
-    const gCols = intF.includes("CEMETERY_NAME") ? intF.slice() : ["CEMETERY_NAME"].concat(intF);
-    L.push({ name: "graves", title: "Graves with a mapped spot (one point per person named on a marker)", kind: "point", cols: gCols, numeric: ["LAT", "LONG"],
-      rows: ints.filter(r => num(r.LAT) != null && num(r.LONG) != null).map(r => ({ geom: [num(r.LONG), num(r.LAT)], props: Object.assign({ CEMETERY_NAME: (byId.get(r.CEMETERY_ID) || {}).NAME || "" }, r) })) });
-    return L;
-  }
-  function geojson(l) {
-    return JSON.stringify({ type: "FeatureCollection", name: l.name, features: l.rows.map(r => {
-      const props = {}; l.cols.forEach(c => { const v = r.props[c]; props[c] = l.numeric.includes(c) ? num(v) : (v == null ? "" : v); });
-      return { type: "Feature", properties: props, geometry: l.kind === "point" ? { type: "Point", coordinates: r.geom } : r.geom.length === 1 ? { type: "Polygon", coordinates: r.geom[0] } : { type: "MultiPolygon", coordinates: r.geom } };
-    }) });
-  }
-  async function siteText(name) {           // a published file that the editor does not keep open (stories, visit history)
-    try { if (/^https?:/.test(location.protocol)) { const r = await fetch(new URL(name, document.baseURI).href, { cache: "no-store" }); if (r.ok) return await r.text(); } } catch (e) {}
-    try { if (window.GHPublish && GHPublish.configured() && GHPublish.hasKey()) return await GHPublish.read(name); } catch (e) {}
-    return null;
-  }
-
-  async function exportGIS() {
-    if (!cems.length) return say("Open a map first.");
-    say("Building the GIS files…");
-    try {
-      const zip = Zip(), L = layers(), lines = [];
-      for (const l of L) {
-        const f = shapefile(l.kind, l.rows, l.cols, l.numeric);
-        for (const [ext, data] of [["shp", f.shp], ["shx", f.shx], ["dbf", f.dbf], ["prj", PRJ], ["cpg", "UTF-8"]]) await zip.add("shapefiles/" + l.name + "." + ext, data);
-        await zip.add("geojson/" + l.name + ".geojson", geojson(l));
-        lines.push("", l.name + "  -  " + l.title + "  -  " + l.rows.length + " record" + (l.rows.length === 1 ? "" : "s"), "  Column in the shapefile = full name");
-        l.cols.forEach((c, i) => lines.push("    " + f.names[i].padEnd(11) + "= " + c));
+  /* add the section whenever a card that asked for it is drawn */
+  let adding = false, lastTarget = null;
+  new MutationObserver(function () {
+    if (adding) return;
+    const raw = infoContent.dataset.storyFor;
+    if (!raw) { lastTarget = null; return; }
+    delete infoContent.dataset.storyFor;                 // one card, one section
+    let t; try { t = JSON.parse(raw); } catch (e) { return; }
+    if (!t || !t.id) return;
+    lastTarget = t;
+    ready.then(function () {
+      if (lastTarget !== t || infoContent.querySelector('[data-st="1"]')) return;
+      adding = true;
+      if ((invite() || store.get(leadKeyName)) && t.id && (t.type === "cemetery" || t.cemetery)) {
+        const isCem = t.type === "cemetery";
+        infoContent.insertAdjacentHTML("beforeend", '<div class="st-svy"><button type="button">' + (isCem ? "Edit This Cemetery" : "Edit This Grave") +
+          '</button><small>' + (isCem ? "Details, hazards, boundary and entrances. Changes are reviewed before they appear." : "Names, dates, condition, photo, or drag it to the right spot. Changes are reviewed before they appear.") + "</small></div>");
+        infoContent.querySelector(".st-svy button").addEventListener("click", function () { goSurvey(isCem ? { cemetery: t.id } : { cemetery: t.cemetery, marker: t.id }); });
       }
-      await zip.add("tables/" + (S.files.cemeteries || "cemlist.csv"), Papa.unparse(cems, { columns: cemF }));
-      await zip.add("tables/" + (S.files.interments || "interments.csv"), Papa.unparse(ints, { columns: intF }));
-      const extra = [];
-      for (const n of [(S.files && S.files.stories) || "stories.csv", "visits.csv"]) { const t = await siteText(n); if (t) { await zip.add("tables/" + n, t); extra.push(n); } }
-      const noSpot = ints.length - L[3].rows.length, noPt = cems.length - L[0].rows.length;
-      await zip.add("README.txt", [
-        (S.name || area()) + " cemetery map: GIS export, " + today(),
-        "",
-        "COORDINATES: WGS 84 latitude / longitude (EPSG:4326), decimal degrees. Every layer uses it.",
-        "",
-        "WHAT IS HERE",
-        "  shapefiles/   For ArcGIS Pro, ArcMap and ThinkGIS. Each layer is 5 files with the same name; keep them together.",
-        "  geojson/      The same layers for ArcGIS Online, QGIS and web maps. Full column names.",
-        "  tables/       The complete records as spreadsheets (open in Excel). These include records with no mapped spot.",
-        "",
-        "HOW TO LOAD",
-        "  ArcGIS Pro:     Map tab > Add Data > pick the .shp file.",
-        "  ArcGIS Online:  Add > Add layer from file > pick a .geojson file.",
-        "  ThinkGIS:       use Import From Shape File, and when asked for the coordinate system choose",
-        "                  WGS 84 latitude/longitude (geographic, decimal degrees).",
-        "  QGIS:           drag a .shp or .geojson file onto the map.",
-        "",
-        "GOOD TO KNOW",
-        "  - Positions come from phones and from map placement. Phone readings are usually within 10 to 15 feet in the open.",
-        "    They are good for finding a stone, not for property lines.",
-        "  - Shapefile column names are limited to 10 characters and text to 254. The full names are listed below,",
-        "    and the full text is in geojson/ and tables/.",
-        "  - CEMETERY_ID (ID in the cemeteries layer) links every layer and table together.",
-        "  - " + noPt + " of " + cems.length + " cemeteries and " + noSpot + " of " + ints.length + " grave records have no mapped spot yet; those are only in tables/.",
-        (extra.length ? "  - Also in tables/: " + extra.join(", ") + " (as published)." : "  - Stories and visit history were not found on the site, so they are not included."),
-        "  - This export includes any changes in the editor that have not been published yet.",
-        "",
-        "LAYERS"].concat(lines).join("\r\n"));
-      const blob = zip.blob(); download(area() + "-gis-" + today() + ".zip", blob);
-      say("GIS export saved to your Downloads (" + fmtSize(blob.size) + "): " + L.map(l => l.rows.length + " " + l.name).join(", ") + ".");
-    } catch (e) { say("The GIS export failed: " + e.message); }
-  }
-
-  /* ================= back up everything ================= */
-  const CSS = ".xt-ov{position:fixed;inset:0;z-index:2147483000;background:#0008;display:flex;align-items:center;justify-content:center;padding:14px;font:14px system-ui,-apple-system,Segoe UI,Arial,sans-serif}" +
-    ".xt-card{background:#fff;color:#1a202c;border-radius:10px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:16px 18px;box-shadow:0 10px 40px #0007}" +
-    ".xt-card h3{margin:0 0 6px;font-size:17px}.xt-card p{margin:6px 0;font-size:13px;line-height:1.5;color:#4a5568}" +
-    ".xt-card label{display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-size:14px;font-weight:normal;text-transform:none;letter-spacing:0;color:#1a202c}.xt-card label small{display:block;color:#6b7280;font-size:12px}" +
-    ".xt-card label input{width:auto;min-height:0;margin:3px 0 0}" +
-    ".xt-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.xt-card button{font:inherit;padding:8px 14px;border:1px solid #cbd2d9;background:#fff;color:#1a202c;border-radius:6px;cursor:pointer;min-height:40px;width:auto}" +
-    ".xt-card button.go{background:#238636;border-color:#238636;color:#fff;font-weight:600}.xt-card button:disabled{opacity:.45;cursor:not-allowed}.xt-msg{margin-top:10px;font-size:13px;line-height:1.5}.xt-msg.err{color:#a33}.xt-msg.ok{color:#1a7f37}";
-  const PAGE = /\.(html?|js|mjs|css|webmanifest|svg|ico|md|txt)$/i, PIC = /\.(jpe?g|png|webp|gif)$/i;
-  const KNOWN = () => ["settings.json", "survey.json", "manifest.json", "survey-manifest.json", "stories.csv", "visits.csv"].concat(Object.values(Object.assign({ motifs: "motifs.json" }, S.files || {})));
-  function isOverlay(p) { return /^overlays\//i.test(p) || (S.overlays || []).some(o => o.url === p); }
-
-  async function fetchFile(path) {
-    const fromTarget = async () => { try { return await GHPublish.readBlob(path); } catch (e) { return null; } };
-    const fromSite = async () => { try { if (!/^https?:/.test(location.protocol)) return null; const r = await fetch(new URL(path.split("/").map(encodeURIComponent).join("/"), document.baseURI).href, { cache: "no-store" }); return r.ok ? await r.blob() : null; } catch (e) { return null; } };
-    const canTarget = window.GHPublish && GHPublish.configured() && GHPublish.hasKey();
-    if (canTarget && GHPublish.isServer()) return (await fromTarget()) || (await fromSite());
-    return (await fromSite()) || (canTarget ? await fromTarget() : null);     // GitHub: the live site is the same files, and faster
-  }
-  async function inboxCopy(zip, step) {
-    const base = String(S.inbox || "").replace(/\/+$/, ""); let key = ""; try { key = localStorage.getItem("leadKey:" + area()) || ""; } catch (e) {}
-    if (!base || !key) return "The inbox is not included: sign in on the Review tab first.";
-    const get = async p => { const r = await fetch(base + "/" + area() + p, { headers: { "X-Lead-Key": key } }); if (!r.ok) throw new Error(String(r.status)); return r; };
-    try {
-      let n = 0, pics = 0;
-      for (const st of ["new", "held", "approved", "rejected"]) {
-        step("Copying the inbox (" + st + ")…");
-        const j = await (await get("/inbox?status=" + st)).json(), items = j.items || [];
-        await zip.add("inbox/" + st + ".json", JSON.stringify(items, null, 1)); n += items.length;
-        if (st === "new" || st === "held") for (const it of items) for (const m of it.media || []) {
-          try { const b = await (await get("/media/" + encodeURIComponent(m.id))).blob(); await zip.add("inbox/photos/" + m.id + "." + ((m.mime || "").split("/")[1] || "jpg").replace("jpeg", "jpg"), b); pics++; } catch (e) {}
-        }
-      }
-      try { await zip.add("inbox/surveyors.json", JSON.stringify((await (await get("/invites")).json()).invites || [], null, 1)); } catch (e) {}
-      try { await zip.add("inbox/leads.json", JSON.stringify((await (await get("/leads")).json()).leads || [], null, 1)); } catch (e) {}   // managers only; names, never keys
-      return "The inbox copy holds " + n + " item" + (n === 1 ? "" : "s") + " and " + pics + " waiting photo" + (pics === 1 ? "" : "s") + ".";
-    } catch (e) { return "The inbox could not be copied (" + e.message + "). Check the lead key on the Review tab."; }
-  }
-
-  function backupDialog() {
-    if (!document.getElementById("xt-css")) document.head.append(mk("style", { id: "xt-css", textContent: CSS }));
-    const canList = window.GHPublish && GHPublish.configured() && GHPublish.hasKey();
-    const ov = mk("div", { className: "xt-ov" }), card = mk("div", { className: "xt-card" }); ov.append(card);
-    const box = (id, label, sub, on) => { const i = mk("input", { type: "checkbox", id, checked: on }); card.append(mk("label", {}, [i, mk("span", {}, [label, mk("small", { textContent: sub })])])); return i; };
-    card.append(mk("h3", { textContent: "Back Up Everything" }), mk("p", { textContent: "Saves one .zip file to your Downloads. Keep a copy somewhere other than this computer." }));
-    const data = box("xt-d", "Map data", "Cemeteries, graves, boundaries, stories, visit history, survey questions and settings", true); data.disabled = true;
-    const pics = box("xt-p", "Photos", canList ? "Every cemetery, grave and story photo" : "Needs the publish settings (the gear next to Publish) so the photos can be listed", canList); pics.disabled = !canList;
-    const over = box("xt-o", "Old map images", canList ? "The scanned historic maps. These are large." : "Needs the publish settings too", canList); over.disabled = !canList;
-    const code = box("xt-c", "The site's pages", "The map, survey and editor themselves, so the .zip is a complete working copy", true);
-    const inb = box("xt-i", "A copy of the inbox", "Surveys and stories waiting or already reviewed, and the list of surveyors", true);
-    const msg = mk("div", { className: "xt-msg" }), go = mk("button", { className: "go", type: "button", textContent: "Back Up" }), no = mk("button", { type: "button", textContent: "Cancel" });
-    card.append(msg, mk("div", { className: "xt-btns" }, [no, go])); document.body.append(ov);
-    let stop = false; no.onclick = () => { stop = true; ov.remove(); };
-    const step = t => { msg.className = "xt-msg"; msg.textContent = t; };
-    go.onclick = async () => {
-      go.disabled = true; [pics, over, code, inb].forEach(i => i.disabled = true);
-      try {
-        const zip = Zip(), notes = [], missing = [];
-        step("Listing the files…");
-        let list = null;
-        if (canList) { try { list = await GHPublish.listFiles(); } catch (e) { notes.push("The file list could not be read (" + e.message + "), so only the known data files and pages were saved. Photos are NOT in this backup."); } }
-        else notes.push("Photos and old map images are NOT in this backup, because the publish settings were not filled in.");
-        const listed = !!list;
-        if (!list) list = [...new Set(KNOWN().concat(code.checked ? ["index.html", "list.html", "cemetery.html", "editor.html", "survey.html", "sw.js", "stories.js", "media.js", "name-search.js", "data-check.js", "inbox-tab.js", "questions-tab.js", "publish.js", "shell.js", "export-tools.js", "qr.js", "editor-theme.css"] : []))];
-        const photoDirs = ["photos/", photoDir("cemeteries"), photoDir("graves"), photoDir("stories")];
-        list = list.filter(p => {
-          if (/^\.|\/\./.test(p)) return false;                                   // hidden folders (.git, .history)
-          if (isOverlay(p)) return over.checked;
-          if (PIC.test(p)) return photoDirs.some(d => p.startsWith(d)) ? pics.checked : code.checked;   // other pictures are the site's own icons
-          return PAGE.test(p) ? code.checked : true;
-        });
-        let done = 0, i = 0;
-        const worker = async () => { while (i < list.length && !stop) { const p = list[i++]; const b = await fetchFile(p); if (b) await zip.add("site/" + p, b); else if (listed) missing.push(p); step("Copying " + (++done) + " of " + list.length + " files (" + fmtSize(zip.size()) + ")…"); } };
-        await Promise.all([worker(), worker(), worker(), worker()]);
-        if (stop) return;
-        if (dirty.size) { for (const [n, t] of outFiles()) await zip.add("not-yet-published/" + n, t); notes.push("You had changes that were not published. They are in the not-yet-published folder."); }
-        if (inb.checked) notes.push(await inboxCopy(zip, step));
-        if (missing.length) notes.push("These files could not be read and are missing: " + missing.slice(0, 20).join(", ") + (missing.length > 20 ? " and " + (missing.length - 20) + " more" : "") + ".");
-        await zip.add("README.txt", [
-          (S.name || area()) + " cemetery map: full backup, " + new Date().toString(),
-          "",
-          "WHAT IS HERE",
-          "  site/                 Every file of the map as it is published. The .csv files open in Excel.",
-          "  not-yet-published/    Changes that were open in the editor but not published (only if there were any).",
-          "  inbox/                A copy of the survey inbox: items waiting, held, approved and rejected,",
-          "                        photos of the waiting ones, and the surveyor list. Lead keys are never included.",
-          "",
-          "TO RESTORE THE MAP",
-          "  Copy everything inside site/ onto any web server, or into a GitHub repository with Pages turned on.",
-          "  Nothing needs installing. The data is the .csv, .json and .geojson files; the photos are in the photo folders.",
-          "",
-          "TO RESTORE THE INBOX",
-          "  The inbox folder is a record, not something to copy back. Approved items are already in the map data.",
-          "  Waiting items are listed in inbox/new.json with their photos in inbox/photos/, so nothing is lost if the inbox is.",
-          "",
-          "NOTES"].concat(notes.length ? notes.map(n => "  - " + n) : ["  - Everything was copied."]).join("\r\n"));
-        const blob = zip.blob(); download(area() + "-backup-" + today() + ".zip", blob);
-        msg.className = "xt-msg " + (missing.length || notes.some(n => /NOT|could not/.test(n)) ? "err" : "ok");
-        msg.textContent = "Saved " + (zip.count() - 1) + " files (" + fmtSize(blob.size) + ") to your Downloads. " + notes.join(" ") + " ";
-        // a backup takes a while, and some browsers (Safari especially) may block a download that wasn't a direct tap: offer a tap-to-save link too
-        msg.append(mk("a", { href: URL.createObjectURL(blob), download: area() + "-backup-" + today() + ".zip", textContent: "Didn't download? Tap here to save it.", style: "font-weight:600" }));
-        no.textContent = "Close";
-      } catch (e) { msg.className = "xt-msg err"; msg.textContent = "The backup failed: " + e.message; go.disabled = false; }
-    };
-  }
-
-  /* ================= File menu ================= */
-  const fileMenu = document.querySelector(".ed-actions .ed-menu") || document.querySelector(".top") || document.body;
-  const item = (label, sub, fn) => { const b = mk("button", { type: "button", textContent: label, onclick: fn }); b.append(mk("small", { textContent: sub })); fileMenu.append(b); return b; };
-  item("Export for GIS", "Shapefiles and GeoJSON for ArcGIS or ThinkGIS", exportGIS);
-  item("Back Up Everything", "One .zip with all data, photos and the inbox", () => { if (!cems.length) return say("Open a map first."); backupDialog(); });
-
-  /* ================= Setup > Map and Look > Photo Folders ================= */
-  const pane = document.getElementById("set");
-  if (pane) {
-    const wrap = mk("div", { id: "xt-paths" }), ins = {};
-    const tidy = v => { v = String(v).trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, ""); return v ? v + "/" : ""; };
-    const set = (k, v) => { S.paths = S.paths || {}; if (v && v !== PATHS_DEF[k]) S.paths[k] = v; else delete S.paths[k]; if (!Object.keys(S.paths).length) delete S.paths; touch("settings"); };
-    wrap.append(mk("h3", { textContent: "Photo Folders" }), mk("small", { textContent: "Where pictures are kept. Leave these alone unless the photos are moving. Changing a folder does not move photos that are already there: copy them to the new folder first." }));
-    [["cemeteries", "Cemetery Photos"], ["graves", "Grave Photos"], ["stories", "Story Photos"]].forEach(([k, label]) => {
-      ins[k] = mk("input", { placeholder: PATHS_DEF[k], onchange: e => { const v = tidy(e.target.value); if (v.split("/").includes("..")) { e.target.value = photoDir(k); return say("A folder name can't contain .."); } set(k, v); e.target.value = photoDir(k); } });
-      wrap.append(mk("label", { textContent: label + " Folder" }), ins[k]);
+      infoContent.insertAdjacentHTML("beforeend", sectionHtml(t, storiesFor(t)));
+      const b = infoContent.querySelector(".st-share:not(.st-fix)"); if (b) b.addEventListener("click", function () { openForm(t); });
+      const fx = infoContent.querySelector(".st-fix"); if (fx) fx.addEventListener("click", function () { openFix(t); });
+      setTimeout(function () { adding = false; }, 0);
     });
-    ins.base = mk("input", { placeholder: "Blank = this site", onchange: e => { let v = e.target.value.trim(); if (v && !/^https:\/\//i.test(v)) { e.target.value = (S.paths && S.paths.base) || ""; return say("That address must start with https://"); } v = v.replace(/\/+$/, ""); set("base", v ? v + "/" : ""); e.target.value = (S.paths && S.paths.base) || ""; } });
-    wrap.append(mk("label", { textContent: "Photos Are Served From Another Address (Optional)" }), ins.base,
-      mk("small", { textContent: "Only for when photos live on a different server or storage, for example https://files.example.gov/cemeteries/. The map then loads pictures from that address plus the folders above. Publish still sends new photos to the publish destination, so that destination must be the same place, or someone must copy them across." }));
-    pane.append(wrap);
-    const fill = () => { ["cemeteries", "graves", "stories"].forEach(k => ins[k].value = photoDir(k)); ins.base.value = (S.paths && S.paths.base) || ""; };
-    const old = window.drawSet;
-    if (typeof old === "function") window.drawSet = function () { const r = old.apply(this, arguments); try { fill(); } catch (e) {} return r; };
-    fill();
+  }).observe(infoContent, { childList: true });
+
+  /* ---------- the Share a Story form ---------- */
+  const modal = document.createElement("div");
+  modal.id = "st-modal"; modal.className = "stm"; modal.hidden = true; modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true"); modal.setAttribute("aria-labelledby", "st-title");
+  modal.innerHTML = `<div class="box">
+    <h2 id="st-title">Share a story or memory</h2><p class="hint" id="st-about"></p>
+    <label for="st-text">Your story, memory or information <span aria-hidden="true">*</span></label>
+    <textarea id="st-text" maxlength="8000" placeholder="She kept bees behind the house on the old Liberty road..."></textarea>
+    <label for="st-type">What kind is it?</label>
+    <select id="st-type"><option>Family story</option><option>Personal memory</option><option>Documented (from a record or newspaper)</option></select>
+    <div id="st-srcwrap" hidden><label for="st-src">Where is it from?</label><input type="text" id="st-src" maxlength="300" placeholder="Liberty Herald, June 3, 1901"></div>
+    <label for="st-name">Your name</label><input type="text" id="st-name" maxlength="120" autocomplete="name"><p class="hint">Shown with the story. Leave blank to share anonymously.</p>
+    <label for="st-conn">Your connection</label><input type="text" id="st-conn" maxlength="120" placeholder="Great-granddaughter, neighbor, historian…">
+    <label for="st-teller">Who told it, if not you</label><input type="text" id="st-teller" maxlength="120">
+    <label for="st-photo">A photo (optional)</label><input type="file" id="st-photo" accept="image/*"><img id="st-thumb" class="thumb" alt="" hidden>
+    <label for="st-audio">A recording (optional)</label><input type="file" id="st-audio" accept="audio/*"><p class="hint" id="st-audiohint">A short voice recording, up to about 2 minutes. For anything longer, or for video, use the link box below.</p>
+    <label for="st-link">A link to a video or recording (optional)</label><input type="text" id="st-link" maxlength="300" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…"><p class="hint">YouTube, Vimeo, or a link to an audio or video file.</p>
+    <label for="st-contact">Email or phone (optional)</label><input type="text" id="st-contact" maxlength="160" autocomplete="email"><p class="hint">Only the county's reviewer sees this, in case they have a question. It is never shown.</p>
+    <label class="chk"><input type="checkbox" id="st-consent"><span>I have the right to share this, including permission from anyone recorded or quoted, and I agree it may be shown on this site and kept in the county archive.</span></label>
+    <p class="hint">A volunteer reviews every story before it appears. Stories about living people, or with private details, may be kept in the archive without being shown.</p>
+    <div class="row"><button type="button" id="st-cancel">Cancel</button><button type="button" class="go" id="st-send">Send</button></div>
+    <div class="msg" id="st-msg" role="status" aria-live="polite"></div></div>`;
+  document.body.append(modal);
+  const $ = id => document.getElementById(id);
+  let target = null, photoData = null, audioData = null, lastFocus = null;
+  const AUDIO_OK = /^audio\/(webm|mp4|mpeg|ogg|aac|x-m4a)$/, AUDIO_MAX = 1400000;   // what the inbox accepts
+  $("st-audio").addEventListener("change", function () {
+    const f = this.files && this.files[0]; audioData = null; if (!f) return;
+    const mime = String(f.type || "").split(";")[0].toLowerCase();
+    if (!AUDIO_OK.test(mime)) { this.value = ""; return say("That kind of recording can't be sent here. Try an .mp3 or .m4a file, or put it online and paste the link below.", true); }
+    if (f.size > AUDIO_MAX) { this.value = ""; return say("That recording is too long to send here (the limit is about 2 minutes). Put it on YouTube or another site and paste the link below.", true); }
+    const r = new FileReader();
+    r.onload = function () { const m = /^data:[^,]*;base64,(.*)$/.exec(String(r.result)); if (m) { audioData = { mime: mime, data: m[1] }; say(""); } };
+    r.onerror = function () { say("That recording couldn't be read.", true); };
+    r.readAsDataURL(f);
+  });
+
+  $("st-type").addEventListener("change", function () { $("st-srcwrap").hidden = !/^Documented/.test(this.value); });
+  $("st-cancel").addEventListener("click", closeForm);
+  modal.addEventListener("click", function (e) { if (e.target === modal) closeForm(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !modal.hidden) closeForm(); });
+  $("st-photo").addEventListener("change", async function () {
+    const f = this.files && this.files[0]; photoData = null; $("st-thumb").hidden = true;
+    if (!f) return;
+    try { photoData = await shrink(f, 1600); $("st-thumb").src = photoData; $("st-thumb").hidden = false; } catch (e) { say(e.message, true); }
+  });
+
+  function shrink(file, max) {
+    return new Promise(function (ok, bad) {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        let q = 0.82, out = c.toDataURL("image/jpeg", q); while (out.length > 1800000 && q > 0.4) { q -= 0.12; out = c.toDataURL("image/jpeg", q); }
+        ok(out);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); bad(new Error("That photo couldn't be read.")); };
+      img.src = url;
+    });
   }
+  function say(t, err) { const m = $("st-msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); }
+  function draftKey() { return "story-draft:" + AREA + ":" + (target ? target.type + ":" + target.id : ""); }
+  function openForm(t) {
+    target = t; lastFocus = document.activeElement; photoData = null; audioData = null; $("st-audio").value = "";
+    $("st-about").textContent = "About: " + (t.label || t.id);
+    let d = {}; try { d = JSON.parse(localStorage.getItem(draftKey()) || "{}"); } catch (e) {}
+    $("st-text").value = d.text || ""; $("st-name").value = d.name || ""; $("st-conn").value = d.connection || ""; $("st-teller").value = d.teller || "";
+    $("st-contact").value = d.contact || ""; $("st-src").value = d.source || ""; $("st-link").value = d.link || ""; $("st-consent").checked = false; $("st-photo").value = ""; $("st-thumb").hidden = true;
+    $("st-type").value = d.type || "Family story"; $("st-srcwrap").hidden = !/^Documented/.test($("st-type").value);
+    $("st-send").disabled = false; say("");
+    modal.hidden = false; $("st-text").focus();
+  }
+  function closeForm() { saveDraft(); modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  function fields() { return { text: $("st-text").value.trim(), type: $("st-type").value, source: $("st-src").value.trim(), name: $("st-name").value.trim(), connection: $("st-conn").value.trim(), teller: $("st-teller").value.trim(), link: $("st-link").value.trim(), contact: $("st-contact").value.trim() }; }
+  function saveDraft() { try { const f = fields(); if (f.text) localStorage.setItem(draftKey(), JSON.stringify(f)); } catch (e) {} }
+  ["st-text", "st-name", "st-conn", "st-teller", "st-contact", "st-src", "st-link"].forEach(id => $(id).addEventListener("input", saveDraft));
+
+  $("st-send").addEventListener("click", async function () {
+    const f = fields();
+    if (!f.text) { say("Please write the story or memory first.", true); $("st-text").focus(); return; }
+    if (f.link && window.StoryMedia) { const c = StoryMedia.check(f.link); if (c.bad.length || !c.ok.length) { say("That link doesn't look right. It should start with https://, like a YouTube address.", true); $("st-link").focus(); return; } }
+    if (!$("st-consent").checked) { say("Please tick the permission box.", true); $("st-consent").focus(); return; }
+    if (!navigator.onLine) { saveDraft(); say("You're offline. Your story is saved on this device. Open this form again when you have signal and press Send.", true); return; }
+    const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+    const media = [], data = Object.assign({}, f, { consent: true, cemetery: target.cemetery || (target.type === "cemetery" ? target.id : ""), person: target.person || "", label: target.label || "", page: location.href.split("?")[0] });
+    if (photoData) { const m = /^data:([^;]+);base64,(.*)$/.exec(photoData); if (m) { media.push({ mime: m[1], data: m[2] }); data.photo = "media:0"; } }
+    if (audioData) { media.push(audioData); data.audio = "media:" + (media.length - 1); }
+    $("st-send").disabled = true; say("Sending…");
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: target.type, id: target.id }, data, media, created: new Date().toISOString(), submitter: f.name }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { try { localStorage.removeItem(draftKey()); } catch (e) {} say("Thank you! A volunteer will review your story before it appears."); setTimeout(function () { modal.hidden = true; }, 2600); }
+      else { $("st-send").disabled = false; say(j.error || "The story couldn't be sent. Please try again.", true); }
+    } catch (e) { $("st-send").disabled = false; saveDraft(); say("No connection to the inbox. Your story is saved on this device; try again in a moment.", true); }
+  });
+
+  /* ---------- Suggest a correction: anyone can point out a mistake; a lead checks it and fixes the record ---------- */
+  const fix = document.createElement("div");
+  fix.id = "cr-modal"; fix.className = "stm"; fix.hidden = true; fix.setAttribute("role", "dialog"); fix.setAttribute("aria-modal", "true");
+  fix.innerHTML = '<div class="box"><h2>Suggest a correction</h2><p class="sub" id="cr-for"></p>' +
+    '<label for="cr-what">What is wrong?</label><textarea id="cr-what" maxlength="1000" placeholder="For example: the death year says 1856"></textarea>' +
+    '<label for="cr-should">What should it say?</label><textarea id="cr-should" maxlength="1000" placeholder="For example: 1858"></textarea>' +
+    '<label for="cr-how">How do you know? *</label><textarea id="cr-how" maxlength="1500" placeholder="For example: I read the stone in 2025, or it is in the family Bible, or the death certificate says so"></textarea>' +
+    '<label for="cr-name">Your name *</label><input type="text" id="cr-name" maxlength="100">' +
+    '<label for="cr-contact">Email or phone (optional, only the reviewer sees it)</label><input type="text" id="cr-contact" maxlength="150">' +
+    '<div class="msg" id="cr-msg" role="status"></div><div class="row"><button type="button" id="cr-cancel">Cancel</button><button type="button" class="go" id="cr-send">Send</button></div></div>';
+  document.body.appendChild(fix);
+  const cf = id => document.getElementById(id);
+  let fixTarget = null;
+  function openFix(t) {
+    fixTarget = t; ["cr-what", "cr-should", "cr-how", "cr-msg"].forEach(id => { const e = cf(id); if (e.tagName === "DIV") e.textContent = ""; else e.value = ""; });
+    cf("cr-for").textContent = "About: " + (t.label || t.id) + ". A volunteer checks every correction before anything changes.";
+    try { cf("cr-name").value = localStorage.getItem("story:name") || cf("cr-name").value; } catch (e) {}
+    fix.hidden = false; cf("cr-send").disabled = false; cf("cr-what").focus();
+  }
+  cf("cr-cancel").onclick = () => { fix.hidden = true; };
+  cf("cr-send").onclick = async () => {
+    const what = cf("cr-what").value.trim(), should = cf("cr-should").value.trim(), how = cf("cr-how").value.trim(), name = cf("cr-name").value.trim(), m = cf("cr-msg");
+    const err = t => { m.textContent = t; m.className = "msg err"; };
+    if (!what && !should) return err("Say what is wrong, or what it should say.");
+    if (!how) { cf("cr-how").focus(); return err("Please say how you know. It helps the reviewer check it."); }
+    if (!name) { cf("cr-name").focus(); return err("Please add your name."); }
+    const t = fixTarget, id = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+    const data = { type: "correction", what, should, how, name, contact: cf("cr-contact").value.trim(), consent: true,
+      text: "Correction: " + (what || "") + (should ? " \u2192 " + should : "") + ". How they know: " + how,
+      cemetery: t.cemetery || (t.type === "cemetery" ? t.id : ""), person: t.person || "", label: t.label || "", page: location.href.split("?")[0] };
+    cf("cr-send").disabled = true; m.textContent = "Sending\u2026"; m.className = "msg";
+    try {
+      const r = await fetch(INBOX + "/" + AREA + "/story", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, kind: "story", target: { type: t.type, id: t.id }, data, media: [], created: new Date().toISOString(), submitter: name }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { m.textContent = "Thank you! A volunteer will check it."; m.className = "msg ok"; setTimeout(() => { fix.hidden = true; }, 2200); }
+      else { cf("cr-send").disabled = false; err(j.error || "It couldn't be sent. Please try again."); }
+    } catch (e) { cf("cr-send").disabled = false; err("No connection right now. Please try again in a moment."); }
+  };
 })();
