@@ -4,6 +4,24 @@
   {
    "type": "Feature",
    "properties": {
+    "CEMETERY_ID": "FC115",
+    "NAME": "Adams",
+    "ENTRANCES": [
+     {
+      "label": "Entrance",
+      "size": "primary",
+      "coords": [
+       -85.167238,
+       39.453556
+      ]
+     }
+    ]
+   },
+   "geometry": null
+  },
+  {
+   "type": "Feature",
+   "properties": {
     "CEMETERY_ID": "UC001",
     "NAME": "Test",
     "ENTRANCES": [
